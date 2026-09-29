@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}{{ category }} – HackLabs{% endblock %}
+
+{% block content %}
+<div class="p-6 lg:p-8 max-w-6xl mx-auto">
+
+  <!-- ── Breadcrumb ── -->
+  <nav class="text-xs text-gray-400 mb-8 flex items-center gap-2">
+    <a href="/" class="hover:opacity-70 transition" data-i18n="home" style="color:var(--hl-primary)">Inicio</a>
+    <i class="ph ph-caret-right text-gray-600" style="font-size:10px"></i>
+    <span class="text-gray-300 font-semibold">{{ category }}</span>
+  </nav>
+
+  <!-- ── Category header ── -->
+  {% set cat_meta = {
+    'OWASP Top 10': {
+      'icon':    'ph-shield-warning',
+      'color':   '#ef4444',
+      'bg':      'rgba(239,68,68,.08)',
+      'border':  'rgba(239,68,68,.25)',
+      'desc_es': 'Los diez riesgos de seguridad web más críticos según OWASP (edición 2021). Cada laboratorio simula una vulnerabilidad real explotable con herramientas de Kali Linux.',
+      'desc_en': 'The ten most critical web application security risks according to OWASP (2021 edition). Each lab simulates a real exploitable vulnerability using Kali Linux tools.',
+      'desc_pt': 'Os dez riscos de segurança web mais críticos segundo a OWASP (edição 2021). Cada laboratório simula uma vulnerabilidade real explorável com ferramentas do Kali Linux.',
+    },
+    'Host Attacks': {
+      'icon':    'ph-shield-check',
+      'color':   '#f97316',
+      'bg':      'rgba(249,115,22,.08)',
+      'border':  'rgba(249,115,22,.25)',
+      'desc_es': 'Ataques contra sistemas, contenedores y servicios de red: C2, escapes de contenedor, escalada de privilegios, shells inversas y explotación de servicios vulnerables.',
+      'desc_en': 'Attacks against systems, containers and network services: C2, container escapes, privilege escalation, reverse shells and vulnerable service exploitation.',
+      'desc_pt': 'Ataques contra sistemas, contêineres e serviços de rede: C2, escapes de contêiner, escalada de privilégios, reverse shells e exploração de serviços vulneráveis.',
+    },
+    'Web Attacks': {
+      'icon':    'ph-globe-hemisphere-west',
+      'color':   '#f97316',
+      'bg':      'rgba(249,115,22,.08)',
+      'border':  'rgba(249,115,22,.25)',
+      'desc_es': 'Ataques realistas contra aplicaciones web y APIs: autenticación, control de acceso, inyección, lógica de negocio, sesiones y protocolos OAuth.',
+      'desc_en': 'Realistic attacks against web applications and APIs: authentication, access control, injection, business logic, sessions and OAuth protocols.',
+      'desc_pt': 'Ataques realistas contra aplicações web e APIs: autenticação, controle de acesso, injeção, lógica de negócios, sessões e protocolos OAuth.',
+    },
+    'AI Attacks': {
+      'icon':    'ph-robot',
+      'color':   'var(--hl-primary)',
+      'bg':      'rgba(var(--hl-primary-rgb),.08)',
+      'border':  'rgba(var(--hl-primary-rgb),.25)',
+      'desc_es': 'Ataques dirigidos a sistemas de Inteligencia Artificial y LLMs: prompt injection, jailbreak e inyección indirecta. Una categoría emergente en la seguridad ofensiva moderna.',
+      'desc_en': 'Attacks targeting Artificial Intelligence systems and LLMs: prompt injection, jailbreak and indirect injection. An emerging category in modern offensive security.',
+      'desc_pt': 'Ataques direcionados a sistemas de Inteligência Artificial e LLMs: prompt injection, jailbreak e injeção indireta. Uma categoria emergente na segurança ofensiva moderna.',
+    },
+    'Active Directory': {
+      'icon':    'ph-buildings',
+      'color':   '#38bdf8',
+      'bg':      'rgba(56,189,248,.08)',
+      'border':  'rgba(56,189,248,.25)',
+      'desc_es': 'Ataques sobre un Domain Controller real y vulnerable: enumeración SMB/LDAP, ataques Kerberos (AS-REP Roasting, Kerberoasting, Silver y Golden Ticket), abuso de ACLs, DCSync y delegación. Cada lab se explota contra el DC que despliega deploy.sh.',
+      'desc_en': 'Attacks against a real, vulnerable Domain Controller: SMB/LDAP enumeration, Kerberos attacks (AS-REP Roasting, Kerberoasting, Silver and Golden Tickets), ACL abuse, DCSync and delegation. Every lab is exploited against the DC deployed by deploy.sh.',
+      'desc_pt': 'Ataques contra um Domain Controller real e vulnerável: enumeração SMB/LDAP, ataques Kerberos (AS-REP Roasting, Kerberoasting, Silver e Golden Ticket), abuso de ACLs, DCSync e delegação. Cada lab é explorado contra o DC implantado pelo deploy.sh.',
+    },
+    'Forense Digital': {
+      'icon':    'ph-magnifying-glass',
+      'color':   '#a78bfa',
+      'bg':      'rgba(167,139,250,.08)',
+      'border':  'rgba(167,139,250,.25)',
+      'desc_es': 'Análisis forense de ficheros de evidencia reales: PCAPs, volcados de memoria, imágenes de disco, metadatos, esteganografía y malware. Cada lab se resuelve descargando y analizando la evidencia con herramientas forenses estándar.',
+      'desc_en': 'Forensic analysis of real evidence files: PCAPs, memory dumps, disk images, metadata, steganography and malware. Each lab is solved by downloading and analyzing the evidence with standard forensic tools.',
+      'desc_pt': 'Análise forense de arquivos de evidência reais: PCAPs, despejos de memória, imagens de disco, metadados, esteganografia e malware. Cada laboratório é resolvido baixando e analisando as evidências com ferramentas forenses padrão.',
+    },
+  } %}
+  {% set meta = cat_meta[category] %}
+
+  <div class="flex items-start gap-5 mb-8 p-6 rounded-2xl border"
+       style="background:{{ meta.bg }};border-color:{{ meta.border }}">
+    <div class="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 border"
+         style="background:{{ meta.bg }};border-color:{{ meta.border }}">
+      <i class="ph {{ meta.icon }} text-3xl" style="color:{{ meta.color }}"></i>
+    </div>
+    <div class="min-w-0">
+      <h1 class="font-bold text-2xl text-gray-900 dark:text-white mb-2 logo-text">{{ category }}</h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed lang-content" data-lang="es">{{ meta.desc_es }}</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed lang-content" data-lang="en" style="display:none">{{ meta.desc_en }}</p>
+      <p class="text-sm text-gray-500 dark:text-gray-400 max-w-2xl leading-relaxed lang-content" data-lang="pt" style="display:none">{{ meta.desc_pt }}</p>
+    </div>
+  </div>
+
+  <!-- ── Stats ── -->
+  {% set counts = namespace(critical=0, high=0, medium=0) %}
+  {% for lab in labs %}
+    {% if lab.risk == 'critical' %}{% set counts.critical = counts.critical + 1 %}{% endif %}
+    {% if lab.risk == 'high'     %}{% set counts.high     = counts.high     + 1 %}{% endif %}
+    {% if lab.risk == 'medium'   %}{% set counts.medium   = counts.medium   + 1 %}{% endif %}
+  {% endfor %}
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+    {% for icon, val, i18n_key, color, bg in [
+      ('ph-flask',          labs|length,      'stat_total',    'var(--hl-primary)', 'rgba(var(--hl-primary-rgb),.1)'),
+      ('ph-skull',          counts.critical,  'stat_critical', '#ef4444',           'rgba(239,68,68,.1)'),
+      ('ph-fire',           counts.high,      'stat_high',     '#f97316',           'rgba(249,115,22,.1)'),
+      ('ph-warning-circle', counts.medium,    'stat_medium',   '#f59e0b',           'rgba(245,158,11,.1)')
+    ] %}
+    <div class="stat-card rounded-xl p-4 border flex items-center gap-3 bg-white dark:bg-dark-800 border-gray-200 dark:border-gray-700/60">
+      <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background:{{ bg }}">
+        <i class="ph {{ icon }} text-xl" style="color:{{ color }}"></i>
+      </div>
+      <div>
+        <div class="text-2xl font-bold logo-text leading-none mb-0.5" style="color:{{ color }}">{{ val }}</div>
+        <div class="text-xs text-gray-400 font-medium" data-i18n="{{ i18n_key }}"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- ── Risk Filters ── -->
+  <div class="flex items-center gap-2 mb-6 flex-wrap">
+    <span class="text-xs text-gray-400 font-semibold uppercase tracking-widest mr-1" data-i18n="filter_label">Filtrar:</span>
+    <button class="risk-filter active" data-risk="all" onclick="filterLabs('all', this)">
+      <i class="ph ph-squares-four text-sm"></i> <span data-i18n="filter_all">Todos</span>
+    </button>
+    <button class="risk-filter risk-filter--critical" data-risk="critical" onclick="filterLabs('critical', this)">
+      <i class="ph ph-skull text-sm"></i> <span data-i18n="stat_critical">Críticos</span>
+    </button>
+    <button class="risk-filter risk-filter--high" data-risk="high" onclick="filterLabs('high', this)">
+      <i class="ph ph-fire text-sm"></i> <span data-i18n="stat_high">Altos</span>
+    </button>
+    <button class="risk-filter risk-filter--medium" data-risk="medium" onclick="filterLabs('medium', this)">
+      <i class="ph ph-warning-circle text-sm"></i> <span data-i18n="stat_medium">Medios</span>
+    </button>
+  </div>
+
+  <!-- ── Lab cards ── -->
+  {% set lab_icons = {
+    'idor':              ('ph-identification-badge', 'Broken Access Control'),
+    'crypto':            ('ph-lock-key-open',         'Crypto Failures'),
+    'sqli':              ('ph-database',              'SQL Injection'),
+    'cmdi':              ('ph-terminal-window',       'Command Injection'),
+    'insecure_design':   ('ph-puzzle-piece',          'Insecure Design'),
+    'misconfig':         ('ph-gear-six',              'Misconfiguration'),
+    'outdated':          ('ph-package',               'Outdated Components'),
+    'auth_failures':     ('ph-shield-slash',          'Auth Failures'),
+    'integrity':         ('ph-file-dashed',           'Integrity Failures'),
+    'logging':           ('ph-eye-slash',             'Logging Failures'),
+    'ssrf':              ('ph-arrows-merge',          'SSRF'),
+    'xss':               ('ph-code',                  'Cross-Site Scripting'),
+    'csrf':              ('ph-arrows-clockwise',      'CSRF'),
+    'file_upload':       ('ph-upload-simple',         'File Upload'),
+    'xxe':               ('ph-file-code',             'XXE Injection'),
+    'path_traversal':    ('ph-folder-dotted',         'Path Traversal'),
+    'bruteforce':        ('ph-password',              'Bruteforce'),
+    'ssti':              ('ph-brackets-curly',        'Template Injection'),
+    'open_redirect':     ('ph-arrow-bend-up-right',   'Open Redirect'),
+    'jwt':               ('ph-seal',                  'JWT Manipulation'),
+    'deserialization':   ('ph-recycle',               'Insecure Deserialization'),
+    'cors':              ('ph-swap',                  'CORS Misconfiguration'),
+    'privesc':           ('ph-arrow-fat-lines-up',    'SSH Privilege Escalation'),
+    'prompt_injection':  ('ph-chat-text',             'Prompt Injection'),
+    'ai_jailbreak':      ('ph-robot',                 'AI Jailbreak'),
+    'indirect_injection':('ph-arrows-in',             'Indirect Prompt Injection'),
+    'api_attacks':       ('ph-plug',                  'Insecure APIs'),
+    'business_logic':    ('ph-storefront',            'Business Logic Flaws'),
+    'c2_sliver':         ('ph-broadcast',             'Command & Control: Sliver'),
+    'host_enum':         ('ph-binoculars',            'Network Enumeration'),
+    'credential_hunting':('ph-keyhole',              'Credential Hunting'),
+    'sudo_suid':         ('ph-shield-warning',        'Sudo Misconfiguration'),
+    'cron_persistence':  ('ph-calendar-check',        'Cron Persistence'),
+    'ssh_lateral':       ('ph-signpost',              'SSH Lateral Movement'),
+    'network_pivoting':  ('ph-git-branch',            'Network Pivoting'),
+    'database_access':   ('ph-hard-drives',           'Database Access'),
+    'container_escape':  ('ph-cube',                  'Container Escape'),
+    'oauth':             ('ph-handshake',             'OAuth 2.0 Attacks'),
+    'race_condition':    ('ph-timer',                 'Race Condition / TOCTOU'),
+    'reverse_shell':     ('ph-terminal',              'Reverse Shell'),
+    'clickjacking':      ('ph-cursor-click',          'Clickjacking'),
+    '2fa_bypass':        ('ph-device-mobile',         '2FA / MFA Bypass'),
+    'reset_poisoning':   ('ph-envelope-open',         'Password Reset Poisoning'),
+    'prompt_leaking':    ('ph-eye',                   'Prompt Leaking'),
+    'llm_exfil':         ('ph-export',                'LLM Data Exfiltration'),
+    'ai_supply_chain':   ('ph-share-network',         'AI Supply Chain Poisoning'),
+  } %}
+
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for l in labs %}
+    {% set icon_info = lab_icons.get(l.id, ('ph-shield', l.title)) %}
+    <a href="/lab/{{ l.id }}" data-risk="{{ l.risk }}"
+      class="lab-card group bg-white dark:bg-dark-800 rounded-xl p-5 transition-transform transition-colors duration-200 block relative overflow-hidden">
+
+      <div class="flex items-start justify-between mb-4">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-200 group-hover:scale-110"
+             style="background:rgba(var(--hl-primary-rgb),.12)">
+          <i class="ph {{ icon_info[0] }} text-xl" style="color:var(--hl-primary)"></i>
+        </div>
+        <span class="text-xs px-2 py-0.5 rounded-full font-semibold risk-badge-{{ l.risk }}">{{ l.risk }}</span>
+      </div>
+
+      <h3 class="font-semibold text-sm text-gray-800 dark:text-gray-200 leading-snug mb-1">{{ l.title }}</h3>
+      <p class="text-xs text-gray-400 dark:text-gray-500 mb-4">{{ icon_info[1] }}</p>
+
+      <div class="flex items-center gap-1 text-xs font-medium" style="color:var(--hl-primary)">
+        <i class="ph ph-arrow-right text-sm transition-transform duration-200 group-hover:translate-x-1"></i>
+        <span data-i18n="open_lab">Abrir lab</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- ── Back to index ── -->
+  <div class="mt-8 text-center">
+    <a href="/" class="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-gray-200 transition">
+      <i class="ph ph-arrow-left text-sm"></i>
+      <span class="lang-content" data-lang="es">Ver todos los laboratorios</span>
+      <span class="lang-content" data-lang="en" style="display:none">View all labs</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Ver todos os laboratórios</span>
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function filterLabs(risk, btn) {
+  document.querySelectorAll('.risk-filter').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.lab-card').forEach(card => {
+    card.style.display = (risk === 'all' || card.dataset.risk === risk) ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

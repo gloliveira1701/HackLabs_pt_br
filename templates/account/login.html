@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Login – HackLabs{% endblock %}
+{% block main_class %}flex items-center justify-center{% endblock %}
+{% block content %}
+<div class="flex items-center justify-center w-full px-4 py-8">
+  <div class="w-full max-w-sm">
+
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+           style="background:var(--hl-primary)">
+        <i class="ph ph-user text-2xl" style="color:var(--hl-on-primary)"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white font-display">
+        <span class="lang-content" data-lang="es">Iniciar sesión</span>
+        <span class="lang-content" data-lang="en" style="display:none">Sign In</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Iniciar sessão</span>
+      </h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <span class="lang-content" data-lang="es">Accede a tu cuenta de HackLabs</span>
+        <span class="lang-content" data-lang="en" style="display:none">Access your HackLabs account</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Acesse sua conta do HackLabs</span>
+      </p>
+    </div>
+
+    {% if error %}
+    <div class="alert-error mb-4 text-sm">{{ error }}</div>
+    {% endif %}
+
+    {% if reset_ok %}
+    <div class="alert-success mb-4 text-sm">
+      <span class="lang-content" data-lang="es">Contraseña actualizada. Ya puedes iniciar sesión.</span>
+      <span class="lang-content" data-lang="en" style="display:none">Password updated. You can now log in.</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Senha atualizada. Você já pode iniciar sessão.</span>
+    </div>
+    {% endif %}
+
+    <div class="flex items-start gap-3 p-3 rounded-xl mb-4 text-xs"
+         style="background:rgba(206,255,0,.06);border:1px solid rgba(206,255,0,.2)">
+      <i class="ph ph-info text-base flex-shrink-0 mt-0.5" style="color:var(--hl-primary)"></i>
+      <div style="color:#9ca3af">
+        <span class="lang-content" data-lang="es">
+          Para guardar el progreso de los labs debes iniciar sesión con una <strong style="color:var(--hl-primary)">cuenta propia</strong>.
+          Los usuarios de laboratorio (<code style="font-size:10px">admin</code>, <code style="font-size:10px">alice</code>…) son para prácticas y no guardan progreso.
+        </span>
+        <span class="lang-content" data-lang="en" style="display:none">
+          To save your lab progress you need a <strong style="color:var(--hl-primary)">custom account</strong>.
+          Lab users (<code style="font-size:10px">admin</code>, <code style="font-size:10px">alice</code>…) are for practice only and do not save progress.
+        </span>
+        <span class="lang-content" data-lang="pt" style="display:none">
+          Para salvar o progresso dos labs você deve iniciar sessão com uma <strong style="color:var(--hl-primary)">conta própria</strong>.
+          Os usuários de laboratório (<code style="font-size:10px">admin</code>, <code style="font-size:10px">alice</code>…) são para práticas e não salvam progresso.
+        </span>
+        <a href="/account/register" style="color:var(--hl-primary)" class="font-semibold hover:opacity-80 transition">
+          <span class="lang-content" data-lang="es">Crear cuenta</span>
+          <span class="lang-content" data-lang="en" style="display:none">Create account</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Criar conta</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="hl-card">
+      <form method="POST" action="/account/login" class="space-y-4">
+        <input type="hidden" name="next" value="{{ next }}" />
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+            <span class="lang-content" data-lang="es">Usuario</span>
+            <span class="lang-content" data-lang="en" style="display:none">Username</span>
+            <span class="lang-content" data-lang="pt" style="display:none">Usuário</span>
+          </label>
+          <input type="text" name="username" required autofocus
+                 class="hl-input" placeholder="tu_usuario" data-i18n-placeholder="ph_username" />
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs text-gray-500 dark:text-gray-400 font-medium">
+              <span class="lang-content" data-lang="es">Contraseña</span>
+              <span class="lang-content" data-lang="en" style="display:none">Password</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Senha</span>
+            </label>
+            <a href="/account/reset-password" class="text-xs font-medium transition hover:opacity-80" style="color:var(--hl-primary)">
+              <span class="lang-content" data-lang="es">¿Has olvidado tu contraseña?</span>
+              <span class="lang-content" data-lang="en" style="display:none">Forgot your password?</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Esqueceu sua senha?</span>
+            </a>
+          </div>
+          <input type="password" name="password" required
+                 class="hl-input" placeholder="••••••••" />
+        </div>
+        <button type="submit" class="btn-primary w-full justify-center">
+          <i class="ph ph-sign-in text-sm"></i>
+          <span class="lang-content" data-lang="es">Entrar</span>
+          <span class="lang-content" data-lang="en" style="display:none">Sign In</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Entrar</span>
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+      <span class="lang-content" data-lang="es">¿No tienes cuenta? <a href="/account/register" class="font-medium transition hover:opacity-80" style="color:var(--hl-primary)">Regístrate</a></span>
+      <span class="lang-content" data-lang="en" style="display:none">Don't have an account? <a href="/account/register" class="font-medium transition hover:opacity-80" style="color:var(--hl-primary)">Sign up</a></span>
+      <span class="lang-content" data-lang="pt" style="display:none">Não tem conta? <a href="/account/register" class="font-medium transition hover:opacity-80" style="color:var(--hl-primary)">Cadastre-se</a></span>
+    </p>
+
+  </div>
+</div>
+{% endblock %}

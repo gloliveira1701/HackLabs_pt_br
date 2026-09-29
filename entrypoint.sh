@@ -1,0 +1,369 @@
+#!/bin/sh
+set -e
+
+echo ''
+echo '    __  __              __    __           __         '
+echo '   / / / /____ _ _____ / /__ / /   ____ _ / /_   _____'
+echo '  / /_/ // __ `// ___// //_// /   / __ `// __ \ / ___/'
+echo ' / __  // /_/ // /__ / ,<  / /___/ /_/ // /_/ /(__  ) '
+echo '/_/ /_/ \__,_/ \___//_/|_|/_____/\__,_//_.___//____/  '
+echo ''
+echo '  Intentionally Vulnerable Labs by afsh4ck'
+echo '  [!] WARNING: This app is INTENTIONALLY INSECURE. Use only in isolated environments.'
+echo ''
+
+# Re-init DB if missing (volume mount may have wiped it)
+if [ ! -f /app/data/hacklabs.db ]; then
+    echo '  [*] Initializing database...'
+    python /app/init_db.py
+fi
+
+# Detect container IP
+IP=$(hostname -i 2>/dev/null | awk '{print $1}')
+
+echo '  ╔════════════════════════════════════════════════════════════╗'
+printf '  ║  Target machine IP:  http://%-32s║\n' "${IP}"
+echo '  ╚════════════════════════════════════════════════════════════╝'
+echo ''
+echo "  HTTP  →  http://${IP}"
+echo "  FTP   →  ${IP}:21"
+echo "  SSH   →  ${IP}:22"
+echo "  SMB   →  ${IP}:445"
+echo ''
+
+# ── SSH service ────────────────────────────────────────────────
+echo '  [*] Configurando SSH...'
+mkdir -p /var/run/sshd /run/sshd
+ssh-keygen -A 2>/dev/null || true
+cat >> /etc/ssh/sshd_config << 'SSHEOF'
+PasswordAuthentication yes
+PermitRootLogin no
+UsePAM no
+StrictModes no
+MaxAuthTries 100
+MaxStartups 200:30:400
+LoginGraceTime 120
+SSHEOF
+/usr/sbin/sshd
+sleep 1
+
+# ── Samba service con shares ───────────────────────────────────
+echo '  [*] Configurando SMB...'
+mkdir -p /var/run/samba /var/lib/samba/private /var/log/samba
+mkdir -p /srv/smb/hacklabs /srv/smb/admin_backup
+printf 'HL{smb_sh4r3_3num3r4ti0n_succ3ss}\n'  > /srv/smb/hacklabs/flag.txt
+printf 'HackLabs internal file share.\n'        > /srv/smb/hacklabs/README.txt
+printf 'HL{4dm1n_b4ckup_3xf1ltr4ti0n}\n'       > /srv/smb/admin_backup/root.txt
+printf 'admin:Summer2019!\n'                    > /srv/smb/admin_backup/passwords.txt
+chmod -R 755 /srv/smb/
+cat > /etc/samba/smb.conf << 'SMBEOF'
+[global]
+   workgroup = WORKGROUP
+   server string = HackLabs
+   security = user
+   map to guest = Never
+   ntlm auth = ntlmv1-permitted
+   lanman auth = no
+   disable netbios = yes
+   smb ports = 445
+   min protocol = NT1
+
+[hacklabs]
+   path = /srv/smb/hacklabs
+   comment = HackLabs Files
+   browseable = yes
+   writable = no
+   valid users = admin alice bob charlie dave
+
+[admin_backup]
+   path = /srv/smb/admin_backup
+   comment = Admin Backup (Restricted)
+   browseable = yes
+   writable = no
+   valid users = admin
+SMBEOF
+
+# ── FTP service (vsftpd real) ──────────────────────────────────
+echo '  [*] Configurando FTP (vsftpd)...'
+mkdir -p /var/run/vsftpd/empty
+cat > /etc/vsftpd.conf << FTPEOF
+listen=YES
+listen_ipv6=NO
+anonymous_enable=NO
+local_enable=YES
+write_enable=NO
+local_umask=022
+dirmessage_enable=YES
+ftpd_banner=vsftpd 3.0.5
+connect_from_port_20=YES
+chroot_local_user=YES
+allow_writeable_chroot=YES
+secure_chroot_dir=/var/run/vsftpd/empty
+pam_service_name=vsftpd
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=40010
+pasv_address=${IP}
+user_config_dir=/etc/vsftpd/users
+FTPEOF
+
+# ── Crear usuarios del laboratorio ────────────────────────────
+echo '  [*] Creando usuarios del laboratorio...'
+for entry in "admin:password1" "alice:Password1" "bob:welcome1" "charlie:changeme" "dave:P@ssw0rd"; do
+    u=$(echo "$entry" | cut -d: -f1)
+    p=$(echo "$entry" | cut -d: -f2-)
+    id "$u" >/dev/null 2>&1 || useradd -m -s /bin/bash "$u"
+    printf '%s:%s\n' "$u" "$p" | chpasswd
+    printf '%s\n%s\n' "$p" "$p" | smbpasswd -s -a "$u" 2>/dev/null || true
+done
+
+# ── Hostname ─────────────────────────────────────────────────
+hostname hacklabs 2>/dev/null || true
+echo 'hacklabs' > /etc/hostname 2>/dev/null || true
+
+# ── Flags en los servicios (una por servicio, separadas) ─────
+# SSH flag: solo en el home → visible al conectar por SSH
+printf 'HL{ssh_brut3f0rc3_l0gin_succ3ss}\n' > /home/admin/user.txt
+chmod 644 /home/admin/user.txt
+for u in alice bob charlie dave; do
+    printf 'HL{%s_ssh_l0gin_succ3ss}\n' "$u" > /home/${u}/user.txt 2>/dev/null || true
+    chmod 644 /home/${u}/user.txt 2>/dev/null || true
+done
+
+# FTP flag: en un directorio dedicado → vsftpd hace chroot ahí (no visible por SSH)
+mkdir -p /etc/vsftpd/users /home/admin/ftp
+printf 'HL{ftp_cr3d3nti4ls_r3us3d}\n' > /home/admin/ftp/ftp_flag.txt
+chmod 755 /home/admin/ftp
+chmod 644 /home/admin/ftp/ftp_flag.txt
+# Configurar vsftpd para que admin aterrice en /home/admin/ftp
+printf 'local_root=/home/admin/ftp\n' > /etc/vsftpd/users/admin
+
+# ── Privilege Escalation vulnerabilities (SSH) ─────────────────
+echo '  [*] Configurando vectores de escalada de privilegios...'
+
+# Flag de root (objetivo final para todos los vectores)
+printf 'HL{r00t_pr1v3sc_succ3ss}\n' > /root/root.txt
+
+# Flag del Final Boss (ubicacion dedicada en root/final_boss)
+mkdir -p /root/final_boss
+printf 'HL{f1n4l_b055_0v3rdr1v3}\n' > /root/final_boss/final_flag.txt
+
+# A05 – Security Misconfiguration: flag en static/files/ (directory listing expuesto)
+# El archivo A05-flag.txt está en static/files/ dentro del código fuente de la app
+chmod 600 /root/root.txt 2>/dev/null || true
+chmod 600 /root/final_boss/final_flag.txt 2>/dev/null || true
+
+# --- admin: sudo completo (necesario para verificar permisos en la máquina) ---
+mkdir -p /etc/sudoers.d
+printf 'admin ALL=(ALL) NOPASSWD: ALL\n' > /etc/sudoers.d/admin
+chmod 440 /etc/sudoers.d/admin 2>/dev/null || true
+
+# --- bob: sudo misconfiguration → vim (GTFOBins: sudo vim -c ':!/bin/bash') ---
+printf 'bob ALL=(ALL) NOPASSWD: /usr/bin/vim\n' > /etc/sudoers.d/bob
+chmod 440 /etc/sudoers.d/bob 2>/dev/null || true
+
+# --- dave: sudo misconfiguration → find (GTFOBins: sudo find . -exec /bin/bash \; -quit) ---
+printf 'dave ALL=(ALL) NOPASSWD: /usr/bin/find\n' > /etc/sudoers.d/dave
+chmod 440 /etc/sudoers.d/dave 2>/dev/null || true
+
+# --- alice: SUID en python3 (python3 -c 'import os; os.setuid(0); os.system("/bin/bash")') ---
+# En python:3.11-slim el binario está en /usr/local/bin/python3
+chmod u+s /usr/local/bin/python3 2>/dev/null || chmod u+s /usr/bin/python3 2>/dev/null || true
+cat > /home/alice/note.txt << 'ALICEEOF'
+Si has llegado aqui desde A03 - Command Injection, aun no has terminado.
+
+Para obtener la flag del lab debes elevar privilegios a root y leer /root/root.txt.
+Pista: enumera binarios SUID y estabiliza bien tu TTY antes de la escalada.
+ALICEEOF
+chown alice:alice /home/alice/note.txt 2>/dev/null || true
+chmod 644 /home/alice/note.txt 2>/dev/null || true
+
+# --- charlie: script de cron escribible world-writable ejecutado por root cada minuto ---
+mkdir -p /opt/scripts
+cat > /opt/scripts/cleanup.sh << 'CRONEOF'
+#!/bin/bash
+# Maintenance cleanup script - runs as root every minute
+find /tmp -type f -mmin +60 -delete 2>/dev/null
+CRONEOF
+chown root:root /opt/scripts/cleanup.sh
+chmod 777 /opt/scripts/cleanup.sh
+printf '* * * * * root /opt/scripts/cleanup.sh\n' > /etc/cron.d/maintenance
+chmod 644 /etc/cron.d/maintenance
+# Pista en el home de charlie
+printf 'Tip: check what runs automatically on this system...\n' > /home/charlie/note.txt
+chmod 644 /home/charlie/note.txt 2>/dev/null || true
+
+echo '  [+] Vectores de privesc configurados.'
+
+# ── Host Attacks H05/H07-H10/H13: artefactos reales dentro del objetivo ──
+echo '  [*] Configurando cadena de post-explotación Host Attacks...'
+mkdir -p /opt/hacklabs/app /root/host-labs /opt/hostlabs /opt/backups/.ssh /srv/internal /opt/hacklabs-db
+
+# H12 — marcador legible únicamente desde una sesión obtenida en el objetivo.
+mkdir -p /opt/hacklabs/c2
+printf 'HL{c2_511v3r_c41184ck_35748115h3d}\n' > /opt/hacklabs/c2/session-marker.txt
+chown root:admin /opt/hacklabs/c2/session-marker.txt
+chmod 640 /opt/hacklabs/c2/session-marker.txt
+
+# H05 — secretos legibles únicamente tras obtener shell como admin.
+cat > /opt/hacklabs/app/.env << 'HOSTENV'
+APP_ENV=production
+DB_ENGINE=sqlite
+DB_PATH=/opt/hacklabs-db/production.db
+DB_USER=app_reader
+BACKUP_KEY=/opt/backups/.ssh/id_rsa
+LAB_MARKER=HL{cr3d5_1n_c0nf19_4nd_h1570ry}
+HOSTENV
+chown root:admin /opt/hacklabs/app/.env
+chmod 640 /opt/hacklabs/app/.env
+
+# H07 — admin ya tiene sudo NOPASSWD:ALL (ver bloque de vectores de privesc
+# más arriba): el propio "sudo -l" revela el camino a root sin necesidad de
+# ningún binario SUID/capability adicional. Ese marcador solo es legible
+# como root, así que confirma que la ruta de abuso real es sudo, no SUID.
+printf 'HL{5ud0_n0p455wd_4ll_m15c0nf19}\n' > /root/host-labs/h07.txt
+chmod 600 /root/host-labs/h07.txt
+
+# H08 — tarea root modificable: la flag fuente no es legible sin explotar cron.
+printf 'HL{cr0n_j08_p3r51573nc3_4ch13v3d}\n' > /root/host-labs/h08.txt
+chmod 600 /root/host-labs/h08.txt
+cat > /opt/hostlabs/telemetry.sh << 'HOSTCRON'
+#!/bin/sh
+find /var/log -type f -name '*.log' -mtime +30 -delete 2>/dev/null
+HOSTCRON
+chown root:root /opt/hostlabs/telemetry.sh
+chmod 777 /opt/hostlabs/telemetry.sh
+printf '* * * * * root /opt/hostlabs/telemetry.sh\n' > /etc/cron.d/hacklabs-telemetry
+chmod 644 /etc/cron.d/hacklabs-telemetry
+
+# H09 — clave privada abandonada que permite movimiento lateral a svc-backup.
+id svc-backup >/dev/null 2>&1 || useradd -m -s /bin/bash svc-backup
+mkdir -p /home/svc-backup/.ssh
+rm -f /opt/backups/.ssh/id_rsa /opt/backups/.ssh/id_rsa.pub
+ssh-keygen -q -t ed25519 -N '' -f /opt/backups/.ssh/id_rsa >/dev/null 2>&1
+cp /opt/backups/.ssh/id_rsa.pub /home/svc-backup/.ssh/authorized_keys
+printf 'HL{55h_k3y_l473r41_m0v3m3n7}\n' > /home/svc-backup/lateral.txt
+chown -R svc-backup:svc-backup /home/svc-backup/.ssh /home/svc-backup/lateral.txt
+chmod 700 /home/svc-backup/.ssh
+chmod 600 /home/svc-backup/.ssh/authorized_keys /home/svc-backup/lateral.txt
+chown root:admin /opt/backups/.ssh/id_rsa /opt/backups/.ssh/id_rsa.pub
+chmod 640 /opt/backups/.ssh/id_rsa
+chmod 644 /opt/backups/.ssh/id_rsa.pub
+
+# H10 — servicio interno ligado solo a loopback, alcanzable mediante túnel SSH.
+printf 'HL{p1v07_70_1n73rn41_n37w0rk}\n' > /srv/internal/index.html
+chmod 600 /srv/internal/index.html
+python3 -m http.server 9090 --bind 127.0.0.1 --directory /srv/internal >/var/log/hacklabs-internal.log 2>&1 &
+
+# H13 — base de datos real con hash MD5 para cracking offline.
+rm -f /opt/hacklabs-db/production.db
+sqlite3 /opt/hacklabs-db/production.db << 'DBEOF'
+CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT UNIQUE, password_hash TEXT, role TEXT);
+CREATE TABLE audit_log (id INTEGER PRIMARY KEY, event TEXT, created_at TEXT);
+INSERT INTO users VALUES (1, 'administrator', '878ee978a29fbf5f016e853b10f40d03', 'admin');
+INSERT INTO users VALUES (2, 'reporting', '5f4dcc3b5aa765d61d8327deb882cf99', 'reader');
+INSERT INTO audit_log VALUES (1, 'legacy password migration pending', '2026-08-28T01:30:00Z');
+DBEOF
+chown root:admin /opt/hacklabs-db/production.db
+chmod 640 /opt/hacklabs-db/production.db
+cat > /opt/hacklabs/app/company-passwords.txt << 'WORDLIST'
+Winter2025!
+HackLabs2026
+Adm1n-DB-2026!
+Database123!
+Summer2026!
+WORDLIST
+chown root:admin /opt/hacklabs/app/company-passwords.txt
+chmod 640 /opt/hacklabs/app/company-passwords.txt
+
+# Iniciar cron solo cuando todas las tareas del sistema y de los Host labs existen.
+# Esto evita la carrera de arranque en la que /etc/cron.d/hacklabs-telemetry
+# podía crearse después del primer escaneo del daemon y no ejecutarse.
+cron 2>/dev/null || true
+
+echo '  [+] Artefactos Host Attacks listos.'
+
+/usr/sbin/smbd 2>/dev/null &
+/usr/sbin/vsftpd &
+sleep 1
+echo '  [+] FTP, SSH y SMB listos.'
+
+# Run Flask (FTP/SSH/SMB handled by real system services above)
+exec python /app/app.py
+
+# Start a small HTTPS redirector on port 443 that redirects all requests to HTTP.
+# This ensures clients that auto-upgrade to HTTPS still reach the app.
+cat > /app/https_redirect.py << 'PY'
+#!/usr/bin/env python3
+from http.server import BaseHTTPRequestHandler, HTTPServer
+import ssl
+import os
+
+IP = os.environ.get('IP', '127.0.0.1')
+PORT = 443
+
+class RedirectHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        location = f'http://{IP}{self.path}'
+        self.send_response(302)
+        self.send_header('Location', location)
+        self.end_headers()
+    def do_POST(self):
+        location = f'http://{IP}{self.path}'
+        self.send_response(302)
+        self.send_header('Location', location)
+        self.end_headers()
+    def log_message(self, format, *args):
+        return
+
+if __name__ == '__main__':
+    cert = '/app/redirect.crt'
+    key  = '/app/redirect.key'
+    # If certs missing, generate a self-signed cert
+    if not (os.path.exists(cert) and os.path.exists(key)):
+        try:
+            os.system(f"openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {key} -out {cert} -subj '/CN={IP}' >/dev/null 2>&1")
+        except Exception:
+            pass
+    httpd = HTTPServer(('', PORT), RedirectHandler)
+    try:
+        httpd.socket = ssl.wrap_socket(httpd.socket, certfile=cert, keyfile=key, server_side=True)
+    except Exception:
+        pass
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+PY
+
+chmod +x /app/https_redirect.py || true
+# Generate self-signed cert with SAN for the container IP (use openssl -addext if available)
+if [ ! -f /app/redirect.crt ] || [ ! -f /app/redirect.key ]; then
+    echo "  [*] Generating self-signed cert for HTTPS redirect..."
+    if command -v openssl >/dev/null 2>&1; then
+        # Try using -addext (OpenSSL >=1.1.1)
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /app/redirect.key -out /app/redirect.crt -subj "/CN=${IP}" \
+            -addext "subjectAltName=IP:${IP}" >/dev/null 2>&1 || \
+        {
+            # Fallback: create a minimal config file for SAN
+            cat > /tmp/openssl_san.cnf <<-EOF
+[req]
+distinguished_name = req_distinguished_name
+[req_distinguished_name]
+[v3_req]
+subjectAltName = @alt_names
+[alt_names]
+IP.1 = ${IP}
+EOF
+            openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+                -keyout /app/redirect.key -out /app/redirect.crt -subj "/CN=${IP}" \
+                -extensions v3_req -config /tmp/openssl_san.cnf >/dev/null 2>&1 || true
+        }
+    fi
+fi
+
+# Export IP for the redirector and start it
+IP=${IP} python /app/https_redirect.py &
+
+exec python /app/app.py

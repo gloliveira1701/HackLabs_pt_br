@@ -1,0 +1,21 @@
+<!-- Partial: lab header breadcrumb + title -->
+{% set cat_slug_map = {'OWASP Top 10': 'owasp', 'Web Attacks': 'web-attacks', 'Host Attacks': 'host-attacks', 'AI Attacks': 'ai-attacks', 'Active Directory': 'active-directory', 'Forense Digital': 'forense-digital'} %}
+{% set cat_slug = cat_slug_map.get(lab.category, '') %}
+<div class="mb-6">
+  <div class="flex items-center gap-2 mb-1.5 text-xs text-gray-400">
+    <a href="/" class="hover:text-primary transition" data-i18n="home">Inicio</a>
+    <span>/</span>
+    <a href="/category/{{ cat_slug }}" class="hover:opacity-70 transition">{{ lab.category }}</a>
+    <span>/</span>
+    <span class="text-gray-600 dark:text-gray-500 truncate" data-i18n="lab_title_{{ lab.id }}">{{ lab.title }}</span>
+  </div>
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="font-bold text-gray-900 dark:text-white leading-snug" style="font-size:32px" data-i18n="lab_title_{{ lab.id }}">{{ lab.title }}</h1>
+    <div class="flex items-center gap-2 flex-shrink-0">
+      <span class="text-xs px-2 py-0.5 rounded font-mono difficulty-btn difficulty-btn--{{ difficulty }}" style="cursor:default;font-size:10px">
+        <i class="ph ph-shield-warning" style="font-size:11px"></i> {{ difficulty | capitalize }}
+      </span>
+      <span class="text-xs px-2 py-0.5 rounded font-mono flex-shrink-0 risk-badge-{{ lab.risk }}">{{ lab.risk }}</span>
+    </div>
+  </div>
+</div>

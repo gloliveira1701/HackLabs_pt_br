@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Outdated Components – HackLabs{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="outdated_obj_desc">La página usa una versión vulnerable de jQuery. Consigue ejecutar XSS y roba la cookie legacy_debug, que contiene la flag.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>HL{···}</code> <span data-i18n="obj_flag_hint">— valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <div class="flex gap-3 items-end mb-4">
+      <div class="flex-1">
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="out_label">Buscar</label>
+        <input type="text" id="search-input" value="{{ query }}" placeholder="Search products..."
+               class="hl-input font-mono" data-i18n-placeholder="out_ph" />
+      </div>
+      <button id="search-btn" class="btn-primary flex-shrink-0" data-i18n="btn_search">Buscar</button>
+    </div>
+    <div id="search-result" class="hl-code text-sm text-gray-500 dark:text-gray-500 min-h-10">
+      {% if query %}<span data-i18n="out_searching">Buscando:</span> {{ query }}{% else %}<span data-i18n="out_enter">Introduce un término de búsqueda...</span>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Pasos de explotación</h3>
+    <ol>
+      <li>La página carga <strong>jQuery 1.6.1</strong> (2011), con múltiples CVEs de XSS.</li>
+      <li>El widget usa <code>$.html()</code> y además inserta <code>q</code> en un script JS sin escape seguro.</li>
+      <li>El servidor deja una cookie vulnerable (<code>legacy_debug</code>) con la flag y sin <code>HttpOnly</code>.</li>
+      <li>Payload para <strong>easy/medium</strong> (XSS HTML):</li>
+    </ol>
+    <pre>&lt;img src=x onerror=alert(document.cookie)&gt;</pre>
+    <ol start="5">
+      <li>Payload para <strong>hard</strong> (rompe el string JS sin usar etiquetas HTML):</li>
+    </ol>
+    <pre>';alert(document.cookie);//</pre>
+    <ol start="6">
+      <li>También por URL:</li>
+    </ol>
+    <pre>/outdated/search?q=%27%3Balert(document.cookie)%3B%2F%2F</pre>
+    <ol start="7">
+      <li>En el alert verás la cookie <code>legacy_debug</code> con <code>flag=HL{···}</code>.</li>
+      <li>CVEs relevantes: <code>CVE-2011-4969</code>, <code>CVE-2015-9251</code>, <code>CVE-2019-11358</code></li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">browser</span> <span class="tools-badge">Burp Suite</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Exploitation Steps</h3>
+    <ol>
+      <li>The page loads <strong>jQuery 1.6.1</strong> (2011), with multiple XSS CVEs.</li>
+      <li>The widget uses <code>$.html()</code> and also injects <code>q</code> into a JS string without safe escaping.</li>
+      <li>The server sets a vulnerable cookie (<code>legacy_debug</code>) containing the lab flag and no <code>HttpOnly</code>.</li>
+      <li>Payload for <strong>easy/medium</strong> (HTML XSS):</li>
+    </ol>
+    <pre>&lt;img src=x onerror=alert(document.cookie)&gt;</pre>
+    <ol start="5">
+      <li>Payload for <strong>hard</strong> (breaks out of JS string, no HTML tags needed):</li>
+    </ol>
+    <pre>';alert(document.cookie);//</pre>
+    <ol start="6">
+      <li>Also via URL:</li>
+    </ol>
+    <pre>/outdated/search?q=%27%3Balert(document.cookie)%3B%2F%2F</pre>
+    <ol start="7">
+      <li>The alert shows <code>legacy_debug</code> with <code>flag=HL{···}</code>.</li>
+      <li>Relevant CVEs: <code>CVE-2011-4969</code>, <code>CVE-2015-9251</code>, <code>CVE-2019-11358</code></li>
+    </ol>
+    <h3>Tools</h3>
+    <div><span class="tools-badge">browser</span> <span class="tools-badge">Burp Suite</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Passos de exploração</h3>
+    <ol>
+      <li>A página carrega o <strong>jQuery 1.6.1</strong> (2011), com múltiplos CVEs de XSS.</li>
+      <li>O widget usa <code>$.html()</code> e além disso insere <code>q</code> em uma string JS sem escape seguro.</li>
+      <li>O servidor define um cookie vulnerável (<code>legacy_debug</code>) contendo a flag do lab e sem <code>HttpOnly</code>.</li>
+      <li>Payload para <strong>fácil/médio</strong> (XSS HTML):</li>
+    </ol>
+    <pre>&lt;img src=x onerror=alert(document.cookie)&gt;</pre>
+    <ol start="5">
+      <li>Payload para <strong>difícil</strong> (quebra a string JS sem necessidade de tags HTML):</li>
+    </ol>
+    <pre>';alert(document.cookie);//</pre>
+    <ol start="6">
+      <li>Também via URL:</li>
+    </ol>
+    <pre>/outdated/search?q=%27%3Balert(document.cookie)%3B%2F%2F</pre>
+    <ol start="7">
+      <li>No alert você verá o cookie <code>legacy_debug</code> com <code>flag=HL{···}</code>.</li>
+      <li>CVEs relevantes: <code>CVE-2011-4969</code>, <code>CVE-2015-9251</code>, <code>CVE-2019-11358</code></li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">browser</span> <span class="tools-badge">Burp Suite</span></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://code.jquery.com/jquery-1.6.1.min.js"></script>
+<script>
+  var initialQuery = "{{ query | safe }}";
+  if (initialQuery) {
+    $('#search-result').html('Results for: <strong>' + initialQuery + '</strong>');
+  }
+  $('#search-btn').click(function() {
+    var q = $('#search-input').val();
+    $('#search-result').html('Results for: <strong>' + q + '</strong>');
+    window.location.href = '/outdated/search?q=' + encodeURIComponent(q);
+  });
+</script>
+{% endblock %}

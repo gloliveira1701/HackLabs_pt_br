@@ -1,0 +1,266 @@
+﻿{% extends "base.html" %}
+{% block title %}{% if lang == 'en' %}Certificate{% else %}Certificado{% endif %} – HackLabs{% endblock %}
+
+{% block content %}
+{% set done_count = completed|length %}
+{% set total_labs = labs|length %}
+{% set pct = ((done_count / total_labs * 100) | round(1)) if total_labs > 0 else 0 %}
+
+<div class="p-6 lg:p-8 max-w-3xl mx-auto">
+
+  <!-- Breadcrumb -->
+  <nav class="text-xs text-gray-400 mb-6 flex items-center gap-2">
+    <a href="/" class="hover:opacity-70 transition" style="color:var(--hl-primary)" data-i18n="home">Inicio</a>
+    <i class="ph ph-caret-right text-gray-600" style="font-size:10px"></i>
+    <a href="/progress" class="hover:opacity-70 transition" style="color:var(--hl-primary)" data-i18n="nav_progress">Mi progreso</a>
+    <i class="ph ph-caret-right text-gray-600" style="font-size:10px"></i>
+    <span class="text-gray-300 font-semibold" data-i18n="nav_certificate">Certificado</span>
+  </nav>
+
+  <!-- Header -->
+  <div class="mb-8">
+    <h1 class="text-xl font-bold text-white flex items-center gap-2 mb-1">
+      <i class="ph-fill ph-certificate" style="color:var(--hl-primary);font-size:1.3rem"></i>
+      <span data-i18n="cert_page_title">Certificado de finalización</span>
+    </h1>
+    <p class="text-sm text-gray-400" data-i18n="cert_page_sub">Completa el 100% de los laboratorios para desbloquear tu certificado gratuito.</p>
+  </div>
+
+  {% if certificate %}
+  <!-- EARNED: cert info -->
+  <div class="reward-card reward-card--gold mb-6">
+    <div class="flex items-center gap-2 mb-4">
+      <i class="ph-fill ph-seal-check" style="color:var(--hl-primary);font-size:1.2rem"></i>
+      <span class="font-bold text-white" data-i18n="cert_unlocked">Certificado desbloqueado</span>
+      <span class="ml-auto text-xs text-gray-400">{{ certificate.issued_at }}</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+      <div class="rounded-lg p-3" style="background:rgba(10,20,42,.55);border:1px solid rgba(206,255,0,.15)">
+        <div class="text-xs uppercase tracking-widest text-gray-500 mb-1" data-i18n="cert_holder">Titular</div>
+        <div class="text-sm font-semibold text-white">{{ learner_name or app_user }}</div>
+      </div>
+      <div class="rounded-lg p-3" style="background:rgba(10,20,42,.55);border:1px solid rgba(206,255,0,.15)">
+        <div class="text-xs uppercase tracking-widest text-gray-500 mb-1" data-i18n="cert_rank">Rango</div>
+        <div class="text-sm font-semibold" style="color:var(--hl-primary)">{{ rank }}</div>
+      </div>
+      <div class="rounded-lg p-3" style="background:rgba(10,20,42,.55);border:1px solid rgba(206,255,0,.15)">
+        <div class="text-xs uppercase tracking-widest text-gray-500 mb-1" data-i18n="cert_issuer">Emisor</div>
+        <div class="text-sm font-semibold text-white">HackLabs Academy</div>
+      </div>
+      <div class="rounded-lg p-3" style="background:rgba(10,20,42,.55);border:1px solid rgba(206,255,0,.15)">
+        <div class="text-xs uppercase tracking-widest text-gray-500 mb-1" data-i18n="cert_issued">Emitido</div>
+        <div class="text-sm font-semibold text-white">{{ certificate.issued_at }}</div>
+      </div>
+    </div>
+
+    <div class="rounded-lg p-3 mb-4" style="background:rgba(10,20,42,.55);border:1px solid rgba(59,130,246,.2)">
+      <div class="text-xs uppercase tracking-widest text-gray-500 mb-1" data-i18n="cert_code_label">Código del certificado</div>
+      <div class="text-xs font-mono break-all text-gray-200 leading-relaxed">{{ certificate.display_code or certificate.cert_code }}</div>
+    </div>
+
+    <div class="flex gap-2 flex-wrap">
+      <a href="/certificate/view" class="reward-chip reward-chip--gold">
+        <i class="ph ph-eye text-xs"></i><span data-i18n="cert_view">Ver certificado</span>
+      </a>
+      {% if certificate_linkedin_share_url %}
+      <a href="{{ certificate_linkedin_share_url }}" target="_blank" rel="noopener" class="reward-chip" style="border-color:rgba(96,165,250,.42);background:rgba(37,99,235,.18);color:#dbeafe">
+        <i class="ph ph-linkedin-logo text-xs"></i><span data-i18n="cert_share_linkedin">Compartir en LinkedIn</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Verify box (earned) -->
+  <div class="reward-card mb-6" style="border-color:rgba(148,163,184,.35);background:rgba(71,85,105,.16)">
+    <div class="reward-card-title" style="color:var(--hl-primary)" data-i18n="cert_verify_title">Validar certificado</div>
+    <div class="mt-2 text-sm text-gray-300 mb-3" data-i18n="cert_verify_sub">
+      Verifica codigos de certificado emitidos por HackLabs.
+    </div>
+    <form method="GET" action="/certificate" class="flex gap-2 flex-wrap">
+      <input
+        name="verify_code"
+        value="{{ verify_code or '' }}"
+        class="hl-input font-mono text-xs flex-1 min-w-[240px]"
+        placeholder="XXXX-XXXX-XXXX-XXXX"
+        autocomplete="off"
+        maxlength="240">
+      <button type="submit" class="lab-complete-btn" style="height:36px">
+        <i class="ph ph-shield-check"></i>
+        <span data-i18n="cert_verify_btn">Validar codigo</span>
+      </button>
+    </form>
+
+    {% if verify_status == 'valid' and verify_cert %}
+    <div class="reward-card mt-4" style="border-color:rgba(34,197,94,.5);background:rgba(22,101,52,.25)">
+      <div class="reward-card-title" style="color:#4ade80"><i class="ph-fill ph-check-circle text-sm"></i> <span data-i18n="cert_valid">Certificado valido</span></div>
+      {% if verify_cert.source == 'signed_offline' %}
+      <div class="mt-2 text-sm text-gray-200">Firma HackLabs autentica (verificado sin conexion). Esta instancia no tiene el registro local del alumno.</div>
+      {% else %}
+      <div class="mt-2 text-sm text-gray-200"><span data-i18n="cert_user">Usuario</span>: <span class="font-semibold">{{ verify_cert.account_username }}</span></div>
+      {% endif %}
+      <div class="text-sm text-gray-300"><span data-i18n="cert_code_label2">Codigo</span>: <span class="font-mono">{{ verify_cert.display_code or verify_cert.cert_code }}</span></div>
+      <div class="text-sm text-gray-400"><span data-i18n="cert_issued">Emitido</span>: {{ verify_cert.issued_at }}</div>
+    </div>
+    {% elif verify_status == 'invalid_format' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_format">Formato invalido. Copia el codigo completo del certificado HackLabs.</div>
+    </div>
+    {% elif verify_status == 'invalid_signature' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_sig">Codigo no valido: la firma criptografica no corresponde a un certificado emitido por HackLabs.</div>
+    </div>
+    {% elif verify_status == 'not_found' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_notfound">Codigo no encontrado en esta instancia de HackLabs.</div>
+    </div>
+    {% elif verify_status == 'empty' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_empty">Introduce un codigo para validar.</div>
+    </div>
+    {% else %}
+    <div class="text-xs text-gray-500 mt-4" data-i18n="cert_verify_hint">
+      Los certificados firmados por HackLabs se validan offline por firma.
+    </div>
+    {% endif %}
+  </div>
+
+  {% else %}
+  <!-- LOCKED: certificate preview + overlay -->
+  <div class="relative rounded-2xl overflow-hidden mb-6" style="border:1px solid rgba(206,255,0,.12)">
+
+    <!-- Certificate canvas preview (blurred) -->
+    <div style="filter:blur(5px) brightness(0.45);pointer-events:none;user-select:none;aspect-ratio:16/9;position:relative;overflow:hidden;
+      background:radial-gradient(ellipse at 78% -5%,rgba(18,38,68,.7) 0%,transparent 48%),
+                 radial-gradient(ellipse at 5% 108%,rgba(6,18,42,.6) 0%,transparent 42%),
+                 linear-gradient(150deg,#07101e 0%,#060910 60%,#02040b 100%)">
+      <!-- glows -->
+      <div style="position:absolute;width:55%;height:80%;border-radius:999px;filter:blur(110px);opacity:.22;background:#ceff00;top:-20%;right:-10%"></div>
+      <div style="position:absolute;width:40%;height:60%;border-radius:999px;filter:blur(110px);opacity:.22;background:#3b82f6;bottom:-20%;left:-8%"></div>
+      <!-- frame border -->
+      <div style="position:absolute;inset:3% 1.7%;border:1px solid rgba(206,255,0,.1);border-radius:14px;"></div>
+      <!-- content -->
+      <div style="position:absolute;inset:3% 1.7%;display:flex;flex-direction:column;justify-content:space-between;padding:3.5% 2%">
+        <!-- topbar -->
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="display:inline-flex;align-items:center;gap:8px">
+            <span style="width:clamp(24px,3vw,36px);height:clamp(24px,3vw,36px);border-radius:28%;background:#ceff00;color:#0b0f1a;display:inline-flex;align-items:center;justify-content:center;font-size:clamp(12px,1.5vw,18px)"><i class="ph-fill ph-flask"></i></span>
+            <div>
+              <div style="font-weight:800;font-size:clamp(12px,1.6vw,22px);color:#f8fafc;letter-spacing:.02em">Hack<span style="color:#ceff00">Labs</span></div>
+              <div style="font-size:clamp(7px,.7vw,10px);letter-spacing:.13em;color:#94a3b8;text-transform:uppercase">Ethical Hacking Labs</div>
+            </div>
+          </div>
+          <div style="border:1px solid rgba(206,255,0,.3);color:#ceff00;padding:.4% 1%;border-radius:999px;font-weight:700;font-size:clamp(8px,.85vw,12px);background:rgba(206,255,0,.07);letter-spacing:.08em;text-transform:uppercase">Completion Verified</div>
+        </div>
+        <!-- title -->
+        <div style="text-align:center">
+          <div style="font-size:clamp(16px,3.8vw,52px);font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#ceff00;text-shadow:0 0 28px rgba(206,255,0,.28)">Certificate Of Mastery</div>
+          <p style="color:#cbd5e1;font-size:clamp(9px,1.1vw,16px);margin:.4% 0 0">This certifies that the learner completed 100% of HackLabs practical tracks.</p>
+        </div>
+        <!-- learner card -->
+        <div style="margin:0 auto;width:82%;text-align:center;border:1px solid rgba(255,255,255,.07);border-radius:10px;background:rgba(10,22,45,.6);padding:1.5% 3%">
+          <div style="text-transform:uppercase;letter-spacing:.2em;font-size:clamp(7px,.7vw,10px);color:#94a3b8;margin-bottom:.4%">Awarded To</div>
+          <div style="font-size:clamp(18px,3.2vw,46px);font-weight:800;color:#f8fafc">{{ app_user }}</div>
+          <div style="font-size:clamp(10px,1.2vw,17px);color:#ceff00;font-weight:700;margin-top:.3%">Master of HackLabs</div>
+        </div>
+        <!-- footer -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <div style="color:#7a8fa8;font-size:clamp(7px,.7vw,10px);letter-spacing:.1em;text-transform:uppercase">HackLabs Offensive Security Program</div>
+          <div style="text-align:right;color:#94a3b8;font-size:clamp(7px,.7vw,10px)">Verify at <code style="background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);color:#bfdbfe;padding:2px 6px;border-radius:4px">/certificate/verify</code></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lock overlay -->
+    <div class="absolute inset-0 flex flex-col items-center justify-center" style="background:rgba(5,8,20,.6);backdrop-filter:blur(2px)">
+      <div class="flex flex-col items-center gap-3 text-center px-6">
+        <div class="w-16 h-16 rounded-full flex items-center justify-center" style="background:rgba(206,255,0,.08);border:2px solid rgba(206,255,0,.25)">
+          <i class="ph-fill ph-lock" style="color:var(--hl-primary);font-size:1.8rem"></i>
+        </div>
+        <div class="text-white font-bold text-base" data-i18n="cert_locked_title">Certificado bloqueado</div>
+        <div class="text-sm text-gray-300"><span data-i18n="cert_locked_pre">Completa el </span><span class="font-semibold" style="color:var(--hl-primary)" data-i18n="cert_locked_highlight">100% de los laboratorios</span><span data-i18n="cert_locked_post"> para desbloquear tu certificado de finalización gratuito.</span></div>
+        <div class="w-full max-w-md mt-1" aria-label="Progress bar">
+          <div class="h-2 rounded-full overflow-hidden" style="background:rgba(148,163,184,.25);border:1px solid rgba(148,163,184,.35)">
+            <div class="h-full rounded-full" style="width:{{ pct }}%;background:linear-gradient(90deg,#84cc16 0%,#ceff00 100%);box-shadow:0 0 10px rgba(206,255,0,.35)"></div>
+          </div>
+        </div>
+        <div class="mt-1 text-xs text-gray-400">
+          <span data-i18n="cert_progress_label">Progreso actual:</span>
+          <span class="font-mono font-semibold text-white ml-1">{{ done_count }}/{{ total_labs }} labs</span>
+          <span class="ml-1" style="color:var(--hl-primary)">({{ pct }}%)</span>
+        </div>
+        <a href="/progress" class="mt-2 reward-chip reward-chip--gold">
+          <i class="ph ph-chart-bar text-xs"></i><span data-i18n="cert_go_progress">Ver mi progreso</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Verify box (locked) -->
+  <div class="reward-card mb-6" style="border-color:rgba(148,163,184,.35);background:rgba(71,85,105,.16)">
+    <div class="reward-card-title" style="color:var(--hl-primary)" data-i18n="cert_verify_title">Validar certificado</div>
+    <div class="mt-2 text-sm text-gray-300 mb-3" data-i18n="cert_verify_sub">
+      Verifica codigos de certificado emitidos por HackLabs, incluso si aun no has completado el 100%.
+    </div>
+    <form method="GET" action="/certificate" class="flex gap-2 flex-wrap">
+      <input
+        name="verify_code"
+        value="{{ verify_code or '' }}"
+        class="hl-input font-mono text-xs flex-1 min-w-[240px]"
+        placeholder="XXXX-XXXX-XXXX-XXXX"
+        autocomplete="off"
+        maxlength="240">
+      <button type="submit" class="lab-complete-btn" style="height:36px">
+        <i class="ph ph-shield-check"></i>
+        <span data-i18n="cert_verify_btn">Validar codigo</span>
+      </button>
+    </form>
+
+    {% if verify_status == 'valid' and verify_cert %}
+    <div class="reward-card mt-4" style="border-color:rgba(34,197,94,.5);background:rgba(22,101,52,.25)">
+      <div class="reward-card-title" style="color:#4ade80"><i class="ph-fill ph-check-circle text-sm"></i> <span data-i18n="cert_valid">Certificado valido</span></div>
+      {% if verify_cert.source == 'signed_offline' %}
+      <div class="mt-2 text-sm text-gray-200">Firma HackLabs autentica (verificado sin conexion). Esta instancia no tiene el registro local del alumno.</div>
+      {% else %}
+      <div class="mt-2 text-sm text-gray-200"><span data-i18n="cert_user">Usuario</span>: <span class="font-semibold">{{ verify_cert.account_username }}</span></div>
+      {% endif %}
+      <div class="text-sm text-gray-300"><span data-i18n="cert_code_label2">Codigo</span>: <span class="font-mono">{{ verify_cert.display_code or verify_cert.cert_code }}</span></div>
+      <div class="text-sm text-gray-400"><span data-i18n="cert_issued">Emitido</span>: {{ verify_cert.issued_at }}</div>
+    </div>
+    {% elif verify_status == 'invalid_format' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_format">Formato invalido. Copia el codigo completo del certificado HackLabs.</div>
+    </div>
+    {% elif verify_status == 'invalid_signature' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_sig">Codigo no valido: la firma criptografica no corresponde a un certificado emitido por HackLabs.</div>
+    </div>
+    {% elif verify_status == 'not_found' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_notfound">Codigo no encontrado en esta instancia de HackLabs.</div>
+    </div>
+    {% elif verify_status == 'empty' %}
+    <div class="reward-card mt-4" style="border-color:rgba(239,68,68,.55);background:rgba(127,29,29,.28)">
+      <div class="reward-card-title" style="color:#f87171"><i class="ph-fill ph-warning-circle text-sm"></i> <span data-i18n="cert_invalid">Certificado no valido</span></div>
+      <div class="mt-2 text-sm" style="color:#fecaca" data-i18n="cert_err_empty">Introduce un codigo para validar.</div>
+    </div>
+    {% else %}
+    <div class="text-xs text-gray-500 mt-4" data-i18n="cert_verify_hint">
+      Los certificados firmados por HackLabs se validan offline por firma.
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}

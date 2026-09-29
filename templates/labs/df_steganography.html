@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block title %}DF03 – Esteganografía en Imagen – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="df_steganography_obj_desc">Esta imagen de una puesta de sol esconde algo más que píxeles. Analiza sus bits menos significativos para recuperar el mensaje oculto.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <span data-i18n="df_obj_flag_where">— la flag está oculta en el propio fichero de evidencia; analízalo y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% include 'labs/_forensic_evidence.html' %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="df_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># zsteg no está en los repos de apt de Kali -- es una gema Ruby
+sudo gem install zsteg
+zsteg sunset.png
+# o con Python + Pillow (ver guía completa)</pre>
+  </div>
+
+  {% include 'labs/_forensic_questions.html' %}
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Por qué funciona</h3>
+    <p>La esteganografía LSB (Least Significant Bit) oculta datos modificando el bit menos significativo de cada byte de color de una imagen. El cambio es tan pequeño (como máximo ±1 en un canal de 0-255) que resulta invisible al ojo humano, pero perfectamente recuperable si sabes dónde mirar.</p>
+
+    <h3>2 · Intentar con herramientas estándar</h3>
+    <p><code>zsteg</code> <strong>no está empaquetado para apt en Kali</strong> — es una gema Ruby, se instala con <code>gem</code>:</p>
+    <pre>sudo gem install zsteg
+zsteg sunset.png</pre>
+    <p>Entre la enorme lista de combinaciones que prueba (bit-plane × canal × orden), una acierta directamente:</p>
+    <pre>b1,rgb,lsb,xy       .. text: "HL{···}"</pre>
+    <p><code>binwalk sunset.png</code> no sirve aquí: busca ficheros incrustados o datos anexados al final del fichero, no datos ocultos en el bit menos significativo de cada píxel — con esta técnica solo confirmará que el PNG es válido y no encontrará nada más, lo cual es normal y no significa que el reto esté roto.</p>
+    <p><code>steghide extract -sf sunset.png</code> <strong>nunca</strong> funcionará aquí: steghide solo soporta JPEG, BMP, WAV y AU — ni siquiera reconoce PNG como formato de entrada (falla con <code>el formato del archivo no es reconocido</code> sea cual sea el contenido del PNG). No es un problema de instalación ni de esta imagen en concreto.</p>
+    <p>Si prefieres no depender de <code>zsteg</code>, puedes extraer el mensaje manualmente: este reto usa un LSB casero (bit menos significativo del canal R, G y B en orden, con un prefijo de 32 bits indicando la longitud del mensaje en bytes) — exactamente la combinación <code>b1,rgb,lsb,xy</code> que <code>zsteg</code> también prueba por defecto.</p>
+
+    <h3>3 · Extracción manual con Python</h3>
+    <pre>python3 - &lt;&lt;'EOF'
+import struct
+from PIL import Image
+img = Image.open('sunset.png')
+pixels = list(img.getdata())
+
+bits = ''
+for px in pixels:
+    for c in px[:3]:
+        bits += str(c & 1)
+
+length = int(bits[:32], 2)
+msg_bits = bits[32:32 + length*8]
+msg = bytes(int(msg_bits[i:i+8], 2) for i in range(0, len(msg_bits), 8))
+print(msg.decode())
+EOF</pre>
+    <p>El script lee el bit menos significativo de cada canal de color, reconstruye primero la longitud del mensaje (32 bits) y después el mensaje en sí.</p>
+
+    <h3>4 · Capturar la flag</h3>
+    <pre>HL{···}</pre>
+
+    <h3>Bonus · Ocultar tu propio mensaje con LSB</h3>
+    <p>La operación inversa: en vez de leer el bit menos significativo de cada canal, lo <em>sobrescribes</em> con los bits de tu mensaje. Mismo esquema que en el reto — prefijo de 32 bits con la longitud, luego el mensaje byte a byte, LSB del canal R, G y B en orden:</p>
+    <pre>python3 - &lt;&lt;'EOF'
+from PIL import Image
+
+message = b"HL{tu_mensaje_secreto}"
+img = Image.open('portada.png').convert('RGB')
+pixels = list(img.getdata())
+
+length_bits = format(len(message), '032b')
+msg_bits = ''.join(format(b, '08b') for b in message)
+bits = length_bits + msg_bits
+
+new_pixels = []
+bit_idx = 0
+for px in pixels:
+    px = list(px)
+    for c in range(3):
+        if bit_idx < len(bits):
+            px[c] = (px[c] & ~1) | int(bits[bit_idx])
+            bit_idx += 1
+    new_pixels.append(tuple(px))
+
+img.putdata(new_pixels)
+img.save('oculto.png')
+EOF</pre>
+    <p>Dos detalles que importan: la imagen de portada necesita al menos <code>(32 + len(mensaje)*8) / 3</code> píxeles (un bit por canal, tres canales por píxel) para poder alojar el mensaje completo, y el fichero de salida <strong>tiene que guardarse como PNG</strong> (u otro formato sin pérdida) — cualquier compresión con pérdida como JPEG recalcula los valores de los píxeles y destruye el LSB. Puedes comprobar que funciona pasando <code>oculto.png</code> por el script de extracción del paso 3, o por <code>zsteg</code> (detecta la misma combinación <code>b1,rgb,lsb,xy</code> que usó este reto).</p>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>No es un control técnico habitual — la esteganografía es difícil de detectar de forma genérica.</li>
+      <li>En entornos sensibles, aplicar recompresión/resize de imágenes subidas por usuarios (destruye el LSB) antes de servirlas.</li>
+      <li>Usar DLP (Data Loss Prevention) con análisis estadístico de LSB en flujos de salida críticos.</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">zsteg</span> <span class="tools-badge">stegsolve</span> <span class="tools-badge">Python + Pillow</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · Why it works</h3>
+    <p>LSB (Least Significant Bit) steganography hides data by altering the least significant bit of each color byte in an image. The change is so small (at most ±1 on a 0-255 channel) that it's invisible to the human eye, yet perfectly recoverable if you know where to look.</p>
+
+    <h3>2 · Try standard tools first</h3>
+    <p><code>zsteg</code> is <strong>not packaged for apt on Kali</strong> — it's a Ruby gem, install it with <code>gem</code>:</p>
+    <pre>sudo gem install zsteg
+zsteg sunset.png</pre>
+    <p>Among the huge list of combinations it tries (bit-plane × channel × order), one hits directly:</p>
+    <pre>b1,rgb,lsb,xy       .. text: "HL{···}"</pre>
+    <p><code>binwalk sunset.png</code> won't help here: it looks for embedded files or data appended to the end of the file, not data hidden in the least significant bit of each pixel — with this technique it will only confirm the PNG is valid and find nothing else, which is expected and doesn't mean the challenge is broken.</p>
+    <p><code>steghide extract -sf sunset.png</code> will <strong>never</strong> work here: steghide only supports JPEG, BMP, WAV and AU — it doesn't even recognize PNG as an input format (fails with <code>the file format ... is not supported</code> no matter what the PNG contains). It's not an installation issue or specific to this image.</p>
+    <p>If you'd rather not depend on <code>zsteg</code>, you can extract the message manually: this challenge uses a home-made LSB scheme (least significant bit of the R, G, B channels in order, with a 32-bit prefix indicating the message length in bytes) — exactly the <code>b1,rgb,lsb,xy</code> combination <code>zsteg</code> also tries by default.</p>
+
+    <h3>3 · Manual extraction with Python</h3>
+    <pre>python3 - &lt;&lt;'EOF'
+import struct
+from PIL import Image
+img = Image.open('sunset.png')
+pixels = list(img.getdata())
+
+bits = ''
+for px in pixels:
+    for c in px[:3]:
+        bits += str(c & 1)
+
+length = int(bits[:32], 2)
+msg_bits = bits[32:32 + length*8]
+msg = bytes(int(msg_bits[i:i+8], 2) for i in range(0, len(msg_bits), 8))
+print(msg.decode())
+EOF</pre>
+    <p>The script reads the least significant bit of each color channel, first reconstructing the message length (32 bits) and then the message itself.</p>
+
+    <h3>4 · Capture the flag</h3>
+    <pre>HL{···}</pre>
+
+    <h3>Bonus · Hiding your own message with LSB</h3>
+    <p>The reverse operation: instead of reading the least significant bit of each channel, you <em>overwrite</em> it with your message's bits. Same scheme as the challenge — a 32-bit length prefix, then the message byte by byte, LSB of the R, G and B channels in order:</p>
+    <pre>python3 - &lt;&lt;'EOF'
+from PIL import Image
+
+message = b"HL{your_secret_message}"
+img = Image.open('cover.png').convert('RGB')
+pixels = list(img.getdata())
+
+length_bits = format(len(message), '032b')
+msg_bits = ''.join(format(b, '08b') for b in message)
+bits = length_bits + msg_bits
+
+new_pixels = []
+bit_idx = 0
+for px in pixels:
+    px = list(px)
+    for c in range(3):
+        if bit_idx < len(bits):
+            px[c] = (px[c] & ~1) | int(bits[bit_idx])
+            bit_idx += 1
+    new_pixels.append(tuple(px))
+
+img.putdata(new_pixels)
+img.save('hidden.png')
+EOF</pre>
+    <p>Two details that matter: the cover image needs at least <code>(32 + len(message)*8) / 3</code> pixels (one bit per channel, three channels per pixel) to fit the whole message, and the output file <strong>must be saved as PNG</strong> (or another lossless format) — any lossy compression like JPEG recomputes pixel values and destroys the LSB. You can confirm it works by running <code>hidden.png</code> through the extraction script from step 3, or through <code>zsteg</code> (it detects the same <code>b1,rgb,lsb,xy</code> combination this challenge used).</p>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li>Not a common technical control — steganography is generically hard to detect.</li>
+      <li>In sensitive environments, recompress/resize user-uploaded images (destroys the LSB) before serving them.</li>
+      <li>Use DLP (Data Loss Prevention) with statistical LSB analysis on critical outbound flows.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">zsteg</span> <span class="tools-badge">stegsolve</span> <span class="tools-badge">Python + Pillow</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · Por que funciona</h3>
+    <p>A esteganografia LSB (Least Significant Bit) oculta dados modificando o bit menos significativo de cada byte de cor de uma imagem. A alteração é tão sutil (no máximo ±1 em um canal de 0 a 255) que se torna imperceptível ao olho humano, mas perfeitamente recuperável se você souber onde procurar.</p>
+
+    <h3>2 · Tentar primeiro com ferramentas padrão</h3>
+    <p>O <code>zsteg</code> <strong>não está empacotado para o apt no Kali</strong> — é uma gem do Ruby, instale com <code>gem</code>:</p>
+    <pre>sudo gem install zsteg
+zsteg sunset.png</pre>
+    <p>Entre a enorme lista de combinações testadas (bit-plane × canal × ordem), uma tem sucesso direto:</p>
+    <pre>b1,rgb,lsb,xy       .. text: "HL{···}"</pre>
+    <p>O <code>binwalk sunset.png</code> não ajudará aqui: ele busca por arquivos embutidos ou dados anexados ao final do arquivo, e não dados ocultos no bit menos significativo de cada pixel — com essa técnica ele apenas confirmará que o PNG é válido e não encontrará mais nada, o que é esperado e não significa que o desafio esteja corrompido.</p>
+    <p>O <code>steghide extract -sf sunset.png</code> <strong>nunca</strong> funcionará aqui: o steghide só suporta JPEG, BMP, WAV e AU — ele nem sequer reconhece PNG como formato de entrada (falha com erro de formato não suportado independentemente do conteúdo do PNG). Não se trata de problema de instalação nem algo específico desta imagem.</p>
+    <p>Se preferir não depender do <code>zsteg</code>, você pode extrair a mensagem manualmente: este desafio utiliza um esquema LSB customizado (bit menos significativo dos canais R, G e B em ordem, com um prefixo de 32 bits indicando o tamanho da mensagem em bytes) — exatamente a combinação <code>b1,rgb,lsb,xy</code> que o <code>zsteg</code> também testa por padrão.</p>
+
+    <h3>3 · Extração manual com Python</h3>
+    <pre>python3 - &lt;&lt;'EOF'
+import struct
+from PIL import Image
+img = Image.open('sunset.png')
+pixels = list(img.getdata())
+
+bits = ''
+for px in pixels:
+    for c in px[:3]:
+        bits += str(c & 1)
+
+length = int(bits[:32], 2)
+msg_bits = bits[32:32 + length*8]
+msg = bytes(int(msg_bits[i:i+8], 2) for i in range(0, len(msg_bits), 8))
+print(msg.decode())
+EOF</pre>
+    <p>O script lê o bit menos significativo de cada canal de cor, reconstruindo primeiro o tamanho da mensagem (32 bits) e, em seguida, a mensagem em si.</p>
+
+    <h3>4 · Capturar a flag</h3>
+    <pre>HL{···}</pre>
+
+    <h3>Bônus · Ocultar sua própria mensagem com LSB</h3>
+    <p>A operação inversa: em vez de ler o bit menos significativo de cada canal, você o <em>sobrescreve</em> com os bits da sua mensagem. O mesmo esquema do desafio — um prefixo de tamanho de 32 bits, seguido pela mensagem byte a byte, LSB dos canais R, G e B em ordem:</p>
+    <pre>python3 - &lt;&lt;'EOF'
+from PIL import Image
+
+message = b"HL{your_secret_message}"
+img = Image.open('cover.png').convert('RGB')
+pixels = list(img.getdata())
+
+length_bits = format(len(message), '032b')
+msg_bits = ''.join(format(b, '08b') for b in message)
+bits = length_bits + msg_bits
+
+new_pixels = []
+bit_idx = 0
+for px in pixels:
+    px = list(px)
+    for c in range(3):
+        if bit_idx < len(bits):
+            px[c] = (px[c] & ~1) | int(bits[bit_idx])
+            bit_idx += 1
+    new_pixels.append(tuple(px))
+
+img.putdata(new_pixels)
+img.save('hidden.png')
+EOF</pre>
+    <p>Dois detalhes importantes: a imagem de capa precisa de pelo menos <code>(32 + len(message)*8) / 3</code> pixels (um bit por canal, três canais por pixel) para comportar a mensagem completa, e o arquivo de saída <strong>deve ser salvo como PNG</strong> (ou outro formato sem perdas) — qualquer compressão com perdas como o JPEG recalcula os valores dos pixels e destrói o LSB. Você pode validar o funcionamento executando o script de extração do passo 3 em <code>hidden.png</code> ou utilizando o <code>zsteg</code> (ele detecta a mesma combinação <code>b1,rgb,lsb,xy</code> usada neste desafio).</p>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Não é um controle técnico comum — a esteganografia é genericamente difícil de detectar.</li>
+      <li>Em ambientes sensíveis, aplique recompressão/redimensionamento nas imagens enviadas pelos usuários (o que destrói o LSB) antes de disponibilizá-las.</li>
+      <li>Utilize DLP (Data Loss Prevention) com análise estatística de LSB em fluxos de saída críticos.</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">zsteg</span> <span class="tools-badge">stegsolve</span> <span class="tools-badge">Python + Pillow</span></div>
+  </div>
+</div>
+{% endblock %}

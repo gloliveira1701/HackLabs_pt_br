@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Registro – HackLabs{% endblock %}
+{% block main_class %}flex items-center justify-center{% endblock %}
+{% block content %}
+<div class="flex items-center justify-center w-full px-4 py-8">
+  <div class="w-full max-w-sm">
+
+    <div class="text-center mb-8">
+      <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+           style="background:var(--hl-primary)">
+        <i class="ph ph-user-plus text-2xl" style="color:var(--hl-on-primary)"></i>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-white font-display">
+        <span class="lang-content" data-lang="es">Crear cuenta</span>
+        <span class="lang-content" data-lang="en" style="display:none">Create account</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Criar conta</span>
+      </h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <span class="lang-content" data-lang="es">Únete a HackLabs</span>
+        <span class="lang-content" data-lang="en" style="display:none">Join HackLabs</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Junte-se ao HackLabs</span>
+      </p>
+    </div>
+
+    {% if error %}
+    <div class="alert-error mb-4 text-sm">{{ error }}</div>
+    {% endif %}
+
+    <div class="hl-card">
+      <form method="POST" action="/account/register" class="space-y-4">
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+            <span class="lang-content" data-lang="es">Usuario</span>
+            <span class="lang-content" data-lang="en" style="display:none">Username</span>
+            <span class="lang-content" data-lang="pt" style="display:none">Usuário</span>
+          </label>
+          <input type="text" name="username" required autofocus
+                 class="hl-input" placeholder="tu_usuario" data-i18n-placeholder="ph_username" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+            <span class="lang-content" data-lang="es">Email</span>
+            <span class="lang-content" data-lang="en" style="display:none">Email</span>
+            <span class="lang-content" data-lang="pt" style="display:none">E-mail</span>
+          </label>
+          <input type="email" name="email" required
+                 class="hl-input" placeholder="tu@email.com" data-i18n-placeholder="ph_email" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+            <span class="lang-content" data-lang="es">Contraseña</span>
+            <span class="lang-content" data-lang="en" style="display:none">Password</span>
+            <span class="lang-content" data-lang="pt" style="display:none">Senha</span>
+          </label>
+          <input type="password" name="password" required
+                 class="hl-input" placeholder="Mínimo 6 caracteres" data-i18n-placeholder="ph_password_min" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium">
+            <span class="lang-content" data-lang="es">Repite la contraseña</span>
+            <span class="lang-content" data-lang="en" style="display:none">Repeat password</span>
+            <span class="lang-content" data-lang="pt" style="display:none">Repita a senha</span>
+          </label>
+          <input type="password" name="confirm" required
+                 class="hl-input" placeholder="••••••••" />
+        </div>
+        <button type="submit" class="btn-primary w-full justify-center">
+          <i class="ph ph-user-plus text-sm"></i>
+          <span class="lang-content" data-lang="es">Crear cuenta</span>
+          <span class="lang-content" data-lang="en" style="display:none">Create account</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Criar conta</span>
+        </button>
+      </form>
+    </div>
+
+    <p class="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
+      <span class="lang-content" data-lang="es">¿Ya tienes cuenta? <a href="/account/login" class="font-medium transition hover:opacity-80" style="color:var(--hl-primary)">Inicia sesión</a></span>
+      <span class="lang-content" data-lang="en" style="display:none">Already have an account? <a href="/account/login" class="font-medium transition hover:opacity-80" style="color:var(--hl-primary)">Log in</a></span>
+      <span class="lang-content" data-lang="pt" style="display:none">Já tem conta? <a href="/account/login" class="font-medium transition hover:opacity-80" style="color:var(--hl-primary)">Iniciar sessão</a></span>
+    </p>
+
+  </div>
+</div>
+{% endblock %}

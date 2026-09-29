@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Verificar Certificado - HackLabs{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto w-full">
+  <div class="hl-card">
+    <div class="text-xs uppercase tracking-widest mb-3" style="color:var(--hl-primary)">HackLabs Certificate Registry</div>
+    <h1 class="text-xl font-bold text-white mb-4">Verificación de Certificado</h1>
+
+    <form method="GET" action="/certificate/verify" class="flex gap-2 flex-wrap mb-5">
+      <input name="code" value="{{ code }}" class="hl-input font-mono text-xs flex-1 min-w-[240px]" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="240" autocomplete="off">
+      <button type="submit" class="lab-complete-btn" style="height:36px">
+        <i class="ph ph-magnifying-glass"></i>
+        <span>Verificar</span>
+      </button>
+    </form>
+
+    {% if status == 'valid' and cert %}
+    <div class="reward-card">
+      <div class="reward-card-title">Certificado Valido</div>
+      {% if cert.source == 'signed_offline' %}
+      <div class="mt-2 text-sm text-gray-200">Firma HackLabs autentica (verificado sin conexion, sin consultar ninguna base de datos). Esta instancia no tiene el registro local del alumno.</div>
+      {% else %}
+      <div class="mt-2 text-sm text-gray-200">Usuario: <span class="font-semibold">{{ cert.account_username }}</span></div>
+      {% endif %}
+      <div class="text-sm text-gray-300">Codigo: <span class="font-mono">{{ cert.display_code or cert.cert_code }}</span></div>
+      <div class="text-sm text-gray-400">Emitido: {{ cert.issued_at }}</div>
+    </div>
+    {% elif status == 'invalid_format' %}
+    <div class="alert-error text-sm">Formato invalido. Copia el codigo completo del certificado HackLabs.</div>
+    {% elif status == 'invalid_signature' %}
+    <div class="alert-error text-sm">Codigo no valido: la firma criptografica no corresponde a un certificado emitido por HackLabs.</div>
+    {% elif status == 'not_found' %}
+    <div class="alert-error text-sm">Codigo legacy no encontrado en esta instancia local de HackLabs.</div>
+    {% elif status == 'empty' %}
+    <div class="alert-error text-sm">Introduce un codigo para validar.</div>
+    {% else %}
+    <div class="text-sm text-gray-500">Introduce un codigo de certificado para validar su autenticidad. Los certificados firmados se validan offline en cualquier instalacion de HackLabs.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

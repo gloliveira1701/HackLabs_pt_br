@@ -1,0 +1,51 @@
+# ──────────────────────────────────────────────────────────────────
+# HackLabs – Docker Compose (bridge, acceso por IP del host)
+#
+# USAGE:
+#   docker compose up -d
+#   docker compose logs hacklabs   ← muestra la IP del host
+#
+# La app corre en puerto 5000 del host (http://HOST_IP:5000)
+# También expone FTP:21, SSH:22, SMB:445
+# ──────────────────────────────────────────────────────────────────
+
+services:
+  hacklabs:
+    build: .
+    restart: unless-stopped
+    environment:
+      - APP_PORT=5000
+    ports:
+      - "5000:5000"   # HTTP / Flask
+      - "21:21"       # FTP
+      - "22:22"       # SSH (simulado)
+      - "445:445"     # SMB (simulado)
+    volumes:
+      - hacklabs_db:/app/data
+      - hacklabs_uploads:/app/uploads
+      - hacklabs_logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock  # Container Escape lab
+
+# ──────────────────────────────────────────────────────────────────
+# Opción avanzada: macvlan (IP propia en la LAN, requiere root)
+# Descomenta y comenta el bloque anterior si la prefieres.
+# ──────────────────────────────────────────────────────────────────
+#   networks:
+#     hacknet:
+#       ipv4_address: 192.168.1.100   # opcional
+#
+# networks:
+#   hacknet:
+#     driver: macvlan
+#     driver_opts:
+#       parent: eth0
+#     ipam:
+#       config:
+#         - subnet: 192.168.1.0/24
+#           gateway: 192.168.1.1
+#           ip_range: 192.168.1.128/25
+
+volumes:
+  hacklabs_db:
+  hacklabs_uploads:
+  hacklabs_logs:
