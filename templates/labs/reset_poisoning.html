@@ -30,6 +30,18 @@
           {% else %}Tip: look for other host override headers (<code>X-Host</code>).{% endif %}
         </p>
       </div>
+      <div class="lang-content" data-lang="pt" style="display:none">
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+          O servidor constrói a URL do e-mail de redefinição usando o cabeçalho <code>Host</code> (ou outros cabeçalhos de substituição)
+          sem validação. Se o invasor injetar um domínio malicioso, a vítima recebe um link
+          apontando para o servidor do invasor e o token é exposto.
+        </p>
+        <p class="text-xs text-gray-500">
+          {% if difficulty == 'easy' %}Dica: tente modificar o cabeçalho <code>Host</code> com o Burp Suite.
+          {% elif difficulty == 'medium' %}Dica: o servidor confia em <code>X-Forwarded-Host</code> se estiver presente.
+          {% else %}Dica: procure outros cabeçalhos de substituição de host (<code>X-Host</code>).{% endif %}
+        </p>
+      </div>
     </div>
   </div>
 
@@ -38,6 +50,7 @@
     <div class="text-sm font-semibold text-green-400 mb-1">
       <span class="lang-content" data-lang="es">Token capturado — contraseña comprometida</span>
       <span class="lang-content" data-lang="en" style="display:none">Token captured — password compromised</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Token capturado — senha comprometida</span>
     </div>
     <code class="text-sm font-mono text-green-400">{{ flag }}</code>
   </div>
@@ -54,6 +67,7 @@
     <div class="text-xs font-semibold text-red-400 mb-1">
       <span class="lang-content" data-lang="es">Ataque exitoso — el link de reset apunta a tu servidor</span>
       <span class="lang-content" data-lang="en" style="display:none">Attack successful — the reset link points to your server</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Ataque bem-sucedido — o link de redefinição aponta para o seu servidor</span>
     </div>
     <code class="text-xs font-mono text-red-300 break-all">{{ last_link }}</code>
   </div>
@@ -64,6 +78,7 @@
     <h2 class="text-sm font-semibold mb-4" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">Solicitar restablecimiento de contraseña</span>
       <span class="lang-content" data-lang="en" style="display:none">Request password reset</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Solicitar redefinição de senha</span>
     </h2>
     <form method="POST" action="/reset_poisoning/request" class="space-y-4">
       <div>
@@ -74,6 +89,7 @@
       <button type="submit" class="btn-primary">
         <span class="lang-content" data-lang="es">Enviar enlace de reset</span>
         <span class="lang-content" data-lang="en" style="display:none">Send reset link</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Enviar link de redefinição</span>
       </button>
     </form>
   </div>

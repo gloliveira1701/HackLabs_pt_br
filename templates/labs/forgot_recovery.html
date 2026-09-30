@@ -25,6 +25,16 @@
         {% else %}Hard: token prefix validation (partial brute force).{% endif %}
       </p>
     </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">
+        Fluxo de recuperação de senha vulnerável a enumeração, validação fraca de token e sequestro de conta (account takeover).
+      </p>
+      <p class="text-xs text-gray-500">
+        {% if difficulty == 'easy' %}Easy: código curto e respostas que enumeram usuários.
+        {% elif difficulty == 'medium' %}Medium: token global reutilizável entre contas.
+        {% else %}Hard: validação por prefixo de token (força bruta parcial).{% endif %}
+      </p>
+    </div>
   </div>
 
   {% if message %}
@@ -39,6 +49,7 @@
     <h2 class="text-sm font-semibold mb-3" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">1) Solicitar recuperación</span>
       <span class="lang-content" data-lang="en" style="display:none">1) Request Recovery</span>
+      <span class="lang-content" data-lang="pt" style="display:none">1) Solicitar recuperação</span>
     </h2>
     <form method="POST" action="/forgot-recovery" class="space-y-3">
       <input type="hidden" name="action" value="request" />
@@ -46,12 +57,14 @@
         <label class="block text-xs text-gray-500 mb-1">
           <span class="lang-content" data-lang="es">Usuario o email</span>
           <span class="lang-content" data-lang="en" style="display:none">Username or email</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Usuário ou e-mail</span>
         </label>
         <input type="text" name="identifier" class="hl-input" placeholder="admin / admin@hacklabs.local" />
       </div>
       <button type="submit" class="btn-primary">
         <span class="lang-content" data-lang="es">Solicitar reset</span>
         <span class="lang-content" data-lang="en" style="display:none">Request reset</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Solicitar redefinição</span>
       </button>
     </form>
   </div>
@@ -62,6 +75,7 @@
     <h2 class="text-sm font-semibold mb-3" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">2) Confirmar nueva contraseña</span>
       <span class="lang-content" data-lang="en" style="display:none">2) Confirm New Password</span>
+      <span class="lang-content" data-lang="pt" style="display:none">2) Confirmar nova senha</span>
     </h2>
     <form method="POST" action="/forgot-recovery" class="space-y-3">
       <input type="hidden" name="action" value="reset" />
@@ -74,12 +88,14 @@
         <label class="block text-xs text-gray-500 mb-1">
           <span class="lang-content" data-lang="es">Nueva contraseña</span>
           <span class="lang-content" data-lang="en" style="display:none">New password</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Nova senha</span>
         </label>
         <input type="text" name="new_password" class="hl-input" placeholder="newPassword123" />
       </div>
       <button type="submit" class="btn-primary">
         <span class="lang-content" data-lang="es">Actualizar contraseña</span>
         <span class="lang-content" data-lang="en" style="display:none">Update password</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Atualizar senha</span>
       </button>
     </form>
   </div>

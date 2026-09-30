@@ -13,8 +13,18 @@
   {% include 'labs/_ad_target.html' %}
 
   <div class="hl-card mb-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
-    <p class="text-sm text-gray-600 dark:text-gray-400"><code>impacket-secretsdump -just-dc</code> falla contra este DC por un bug real de parseo en el cliente: la llamada DRSUAPI se completa con <code>ERROR_SUCCESS</code>, pero impacket detecta errores mirando solo los últimos 4 bytes crudos de la respuesta, y Samba los rellena de forma distinta a un DC Windows real — dispara una falsa alarma. Tus derechos de replicación son reales y están correctamente delegados (verificable por LDAP). Descarga <code>secretsdump_fixed.py</code> del share <code>public</code>: hace la misma comprobación de derechos por LDAP de verdad y, si la pasas, vuelca las 15 cuentas del dominio.</p>
+    <div class="lang-content" data-lang="es">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400"><code>impacket-secretsdump -just-dc</code> falla contra este DC por un bug real de parseo en el cliente: la llamada DRSUAPI se completa con <code>ERROR_SUCCESS</code>, pero impacket detecta errores mirando solo los últimos 4 bytes crudos de la respuesta, y Samba los rellena de forma distinta a un DC Windows real — dispara una falsa alarma. Tus derechos de replicación son reales y están correctamente delegados (verificable por LDAP). Descarga <code>secretsdump_fixed.py</code> del share <code>public</code>: hace la misma comprobación de derechos por LDAP de verdad y, si la pasas, vuelca las 15 cuentas del dominio.</p>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Note about this Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400"><code>impacket-secretsdump -just-dc</code> fails against this DC due to a genuine client parsing bug: the DRSUAPI call actually completes with <code>ERROR_SUCCESS</code>, but impacket checks for errors by inspecting only the last 4 raw bytes of the response buffer, and Samba pads them differently than a real Windows DC — triggering a false alarm. Your replication rights are genuine and properly delegated (verifiable via LDAP). Download <code>secretsdump_fixed.py</code> from the <code>public</code> share: it performs the same live LDAP rights validation and, once verified, dumps the domain's 15 user accounts.</p>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">O <code>impacket-secretsdump -just-dc</code> falha contra este DC devido a um bug real de parsing no próprio cliente: a chamada DRSUAPI é concluída com <code>ERROR_SUCCESS</code>, mas o impacket verifica erros inspecionando apenas os últimos 4 bytes brutos do buffer de resposta, e o Samba preenche esses bytes de forma diferente de um DC Windows real — disparando um falso positivo. Seus direitos de replicação são autênticos e estão corretamente delegados (verificável via LDAP). Baixe o <code>secretsdump_fixed.py</code> do compartilhamento <code>public</code>: ele realiza a mesma validação real de direitos via LDAP e, se aprovado, extrai as 15 contas do domínio.</p>
+    </div>
   </div>
 
   <div class="hl-card mb-4">

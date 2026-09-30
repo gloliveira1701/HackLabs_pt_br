@@ -31,16 +31,44 @@
   {% endif %}
 
   <div class="hl-card mb-4">
-    <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)" data-i18n="misconfig_title">Configuraciones inseguras detectadas</div>
-    <p class="text-xs text-gray-400 mb-3">Este servidor expone múltiples recursos sensibles sin ningún mecanismo de autenticación ni control de acceso. Usa fuzzing de directorios para descubrirlos y obtén la flag oculta en el servidor.</p>
-    <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-      <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span data-i18n="misconfig_item1">Panel de administración accesible sin autenticación (<code>/admin</code>)</span></li>
-      <li class="flex items-start gap-2"><i class="ph ph-warning text-orange-400 mt-0.5 flex-shrink-0"></i><span data-i18n="misconfig_item2">Repositorio Git expuesto públicamente (<code>/.git/config</code>)</span></li>
-      <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span data-i18n="misconfig_item3">Stack trace completo del servidor visible en errores (<code>/debug/error</code>)</span></li>
-      <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span data-i18n="misconfig_item4">API interna de usuarios sin autenticación (<code>/api/users</code>)</span></li>
-      <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Directory listing habilitado en <code>/secrets</code> — expone archivos internos sensibles del servidor</span></li>
-    </ul>
-    <p class="text-xs text-gray-400 mt-4"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500">Objetivo:</strong> Encuentra y accede al archivo de flag oculto en el servidor usando fuzzing de directorios.</p>
+    <div class="lang-content" data-lang="es">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Configuraciones inseguras detectadas</div>
+      <p class="text-xs text-gray-400 mb-3">Este servidor expone múltiples recursos sensibles sin ningún mecanismo de autenticación ni control de acceso. Usa fuzzing de directorios para descubrirlos y obtén la flag oculta en el servidor.</p>
+      <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Panel de administración accesible sin autenticación (<code>/admin</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-orange-400 mt-0.5 flex-shrink-0"></i><span>Repositorio Git expuesto públicamente (<code>/.git/config</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span>Stack trace completo del servidor visible en errores (<code>/debug/error</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span>API interna de usuarios sin autenticación (<code>/api/users</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Directory listing habilitado en <code>/secrets</code> — expone archivos internos sensibles del servidor</span></li>
+      </ul>
+      <p class="text-xs text-gray-400 mt-4"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500">Objetivo:</strong> Encuentra y accede al archivo de flag oculto en el servidor usando fuzzing de directorios.</p>
+    </div>
+
+    <div class="lang-content" data-lang="en" style="display:none">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Insecure Configurations Detected</div>
+      <p class="text-xs text-gray-400 mb-3">This server exposes multiple sensitive resources without any authentication or access control mechanism. Use directory fuzzing to discover them and retrieve the hidden flag on the server.</p>
+      <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Admin panel accessible without authentication (<code>/admin</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-orange-400 mt-0.5 flex-shrink-0"></i><span>Publicly exposed Git repository (<code>/.git/config</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span>Full server stack trace visible in errors (<code>/debug/error</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span>Internal user API without authentication (<code>/api/users</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Directory listing enabled in <code>/secrets</code> — exposes sensitive internal server files</span></li>
+      </ul>
+      <p class="text-xs text-gray-400 mt-4"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500">Objective:</strong> Find and access the hidden flag file on the server using directory fuzzing.</p>
+    </div>
+
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Configurações inseguras detectadas</div>
+      <p class="text-xs text-gray-400 mb-3">Este servidor expõe múltiplos recursos sensíveis sem qualquer mecanismo de autenticação ou controle de acesso. Use fuzzing de diretórios para descobri-los e obter a flag oculta no servidor.</p>
+      <ul class="space-y-2 text-sm text-gray-700 dark:text-gray-300">
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Painel de administração acessível sem autenticação (<code>/admin</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-orange-400 mt-0.5 flex-shrink-0"></i><span>Repositório Git exposto publicamente (<code>/.git/config</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span>Stack trace completo do servidor visível em erros (<code>/debug/error</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-yellow-400 mt-0.5 flex-shrink-0"></i><span>API interna de usuários sem autenticação (<code>/api/users</code>)</span></li>
+        <li class="flex items-start gap-2"><i class="ph ph-warning text-red-400 mt-0.5 flex-shrink-0"></i><span>Directory listing habilitado em <code>/secrets</code> — expõe arquivos internos sensíveis do servidor</span></li>
+      </ul>
+      <p class="text-xs text-gray-400 mt-4"><i class="ph ph-flag text-green-500"></i> <strong class="text-green-500">Objetivo:</strong> Encontre e acesse o arquivo de flag oculto no servidor usando fuzzing de diretórios.</p>
+    </div>
   </div>
 </div>
 

@@ -34,20 +34,52 @@
     </div>
 
     <div class="mt-4 hl-code text-xs">
-      <div class="text-gray-400"># Conexión SSH al objetivo (ejemplo)</div>
-      <div>ssh admin@{{ target_ip }}</div>
-      <div class="mt-2 text-gray-400"># Nota: usa las credenciales del lab o las descubiertas por bruteforce</div>
+      <div class="lang-content" data-lang="es">
+        <div class="text-gray-400"># Conexión SSH al objetivo (ejemplo)</div>
+        <div>ssh admin@{{ target_ip }}</div>
+        <div class="mt-2 text-gray-400"># Nota: usa las credenciales del lab o las descubiertas por bruteforce</div>
+      </div>
+      <div class="lang-content" data-lang="en" style="display:none">
+        <div class="text-gray-400"># SSH connection to target (example)</div>
+        <div>ssh admin@{{ target_ip }}</div>
+        <div class="mt-2 text-gray-400"># Note: use lab credentials or those discovered via bruteforce</div>
+      </div>
+      <div class="lang-content" data-lang="pt" style="display:none">
+        <div class="text-gray-400"># Conexão SSH ao alvo (exemplo)</div>
+        <div>ssh admin@{{ target_ip }}</div>
+        <div class="mt-2 text-gray-400"># Nota: utilize as credenciais do lab ou as descobertas via força bruta</div>
+      </div>
     </div>
   </div>
 
   <div class="hl-card mb-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Objetivos del lab</h3>
-    <ul class="text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
-      <li>Conectar por SSH a la máquina de laboratorio.</li>
-      <li>Levantar Sliver C2 en Kali y generar un implant para la arquitectura objetivo.</li>
-      <li>Transferir y ejecutar el implant en la víctima.</li>
-      <li>Interactuar con la sesión Sliver, enumerar y escalar privilegios básicos.</li>
-    </ul>
+    <div class="lang-content" data-lang="es">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Objetivos del lab</h3>
+      <ul class="text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
+        <li>Conectar por SSH a la máquina de laboratorio.</li>
+        <li>Levantar Sliver C2 en Kali y generar un implant para la arquitectura objetivo.</li>
+        <li>Transferir y ejecutar el implant en la víctima.</li>
+        <li>Interactuar con la sesión Sliver, enumerar y escalar privilegios básicos.</li>
+      </ul>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Lab objectives</h3>
+      <ul class="text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
+        <li>Connect via SSH to the lab machine.</li>
+        <li>Launch Sliver C2 on Kali and generate an implant for the target architecture.</li>
+        <li>Transfer and execute the implant on the victim.</li>
+        <li>Interact with the Sliver session, enumerate and perform basic privilege escalation.</li>
+      </ul>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">Objetivos do laboratório</h3>
+      <ul class="text-sm text-gray-600 dark:text-gray-400 ml-4 list-disc">
+        <li>Conectar-se via SSH à máquina do laboratório.</li>
+        <li>Inicializar o Sliver C2 no Kali e gerar um implant para a arquitetura alvo.</li>
+        <li>Transferir e executar o implant na máquina vítima.</li>
+        <li>Interagir com a sessão do Sliver, enumerar e realizar escalação de privilégios básica.</li>
+      </ul>
+    </div>
   </div>
 
 </div>

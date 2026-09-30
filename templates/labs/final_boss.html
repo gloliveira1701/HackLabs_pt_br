@@ -4,29 +4,83 @@
 {% block content %}
 <div class="p-6 lg:p-8 max-w-4xl mx-auto">
   <div class="hl-card" style="border-color:rgba(244,63,94,.45);background:radial-gradient(circle at top right, rgba(244,63,94,.12), rgba(8,9,20,.95) 50%)">
-    <div class="text-xs uppercase tracking-widest mb-2" style="color:#fb7185">Secret Endgame Lab</div>
-    <h1 class="text-2xl font-black text-white mb-3">Final Boss: The Last Root</h1>
-    <p class="text-sm text-gray-300 mb-4">
-      Has desbloqueado el laboratorio secreto por completar el 100% de HackLabs. Este escenario combina enumeracion,
-      chaining de vulnerabilidades y escalada final con restricciones de tiempo.
-    </p>
+    <div class="lang-content" data-lang="es">
+      <div class="text-xs uppercase tracking-widest mb-2" style="color:#fb7185">Secret Endgame Lab</div>
+      <h1 class="text-2xl font-black text-white mb-3">Final Boss: The Last Root</h1>
+      <p class="text-sm text-gray-300 mb-4">
+        Has desbloqueado el laboratorio secreto por completar el 100% de HackLabs. Este escenario combina enumeracion,
+        chaining de vulnerabilidades y escalada final con restricciones de tiempo.
+      </p>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-      <div class="reward-card">
-        <div class="reward-card-title">Objetivo</div>
-        <div class="text-sm text-gray-300 mt-2">Recuperar la flag final desde el sistema raiz.</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+        <div class="reward-card">
+          <div class="reward-card-title">Objetivo</div>
+          <div class="text-sm text-gray-300 mt-2">Recuperar la flag final desde el sistema raiz.</div>
+        </div>
+        <div class="reward-card">
+          <div class="reward-card-title">Reglas</div>
+          <ul class="text-sm text-gray-300 mt-2 space-y-1">
+            <li>- No reiniciar servicios manualmente.</li>
+            <li>- Encadenar al menos dos vectores de ataque.</li>
+            <li>- Documentar cada evidencia recuperada.</li>
+          </ul>
+        </div>
       </div>
-      <div class="reward-card">
-        <div class="reward-card-title">Reglas</div>
-        <ul class="text-sm text-gray-300 mt-2 space-y-1">
-          <li>- No reiniciar servicios manualmente.</li>
-          <li>- Encadenar al menos dos vectores de ataque.</li>
-          <li>- Documentar cada evidencia recuperada.</li>
-        </ul>
-      </div>
+
+      <div class="text-xs text-gray-500">Tip: alterna entre Hard y Nightmare para practicar versiones progresivas del mismo objetivo.</div>
     </div>
 
-    <div class="text-xs text-gray-500">Tip: alterna entre Hard y Nightmare para practicar versiones progresivas del mismo objetivo.</div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <div class="text-xs uppercase tracking-widest mb-2" style="color:#fb7185">Secret Endgame Lab</div>
+      <h1 class="text-2xl font-black text-white mb-3">Final Boss: The Last Root</h1>
+      <p class="text-sm text-gray-300 mb-4">
+        You have unlocked the secret laboratory by completing 100% of HackLabs. This scenario combines enumeration,
+        vulnerability chaining, and final escalation under time constraints.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+        <div class="reward-card">
+          <div class="reward-card-title">Objective</div>
+          <div class="text-sm text-gray-300 mt-2">Retrieve the final flag from the root system.</div>
+        </div>
+        <div class="reward-card">
+          <div class="reward-card-title">Rules</div>
+          <ul class="text-sm text-gray-300 mt-2 space-y-1">
+            <li>- Do not restart services manually.</li>
+            <li>- Chain at least two attack vectors.</li>
+            <li>- Document each piece of retrieved evidence.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="text-xs text-gray-500">Tip: switch between Hard and Nightmare to practice progressive versions of the same objective.</div>
+    </div>
+
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <div class="text-xs uppercase tracking-widest mb-2" style="color:#fb7185">Laboratório Secreto Endgame</div>
+      <h1 class="text-2xl font-black text-white mb-3">Final Boss: The Last Root</h1>
+      <p class="text-sm text-gray-300 mb-4">
+        Você desbloqueou o laboratório secreto ao completar 100% do HackLabs. Este cenário combina enumeração,
+        encadeamento de vulnerabilidades e escalação final com restrições de tempo.
+      </p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+        <div class="reward-card">
+          <div class="reward-card-title">Objetivo</div>
+          <div class="text-sm text-gray-300 mt-2">Recuperar a flag final a partir do sistema raiz.</div>
+        </div>
+        <div class="reward-card">
+          <div class="reward-card-title">Regras</div>
+          <ul class="text-sm text-gray-300 mt-2 space-y-1">
+            <li>- Não reiniciar serviços manualmente.</li>
+            <li>- Encadear pelo menos dois vetores de ataque.</li>
+            <li>- Documentar cada evidência recuperada.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="text-xs text-gray-500">Dica: alterne entre Difícil e Pesadelo para praticar versões progressivas do mesmo objetivo.</div>
+    </div>
   </div>
 </div>
 

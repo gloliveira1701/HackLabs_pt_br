@@ -13,8 +13,18 @@
   {% include 'labs/_ad_target.html' %}
 
   <div class="hl-card mb-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
-    <p class="text-sm text-gray-600 dark:text-gray-400">S4U2Self y S4U2Proxy son, a nivel de protocolo, variantes del TGS-REQ que el KDC embebido de Samba no completa de forma fiable con las herramientas actuales (la misma limitación que afecta a Kerberoasting). La configuración de delegación es <strong>real y auditable por LDAP</strong>: <code>svc.delegate</code> tiene <code>TRUSTED_TO_AUTH_FOR_DELEGATION</code> y <code>msDS-AllowedToDelegateTo=cifs/{{ ad_dc_fqdn }}</code>. Este lab demuestra el impacto accediendo directamente con las credenciales de <code>svc.delegate</code> — la cuenta que, en un dominio real, usarías con <code>impacket-getST</code> para suplantar a cualquier usuario frente a ese servicio.</p>
+    <div class="lang-content" data-lang="es">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">S4U2Self y S4U2Proxy son, a nivel de protocolo, variantes del TGS-REQ que el KDC embebido de Samba no completa de forma fiable con las herramientas actuales (la misma limitación que afecta a Kerberoasting). La configuración de delegación es <strong>real y auditable por LDAP</strong>: <code>svc.delegate</code> tiene <code>TRUSTED_TO_AUTH_FOR_DELEGATION</code> y <code>msDS-AllowedToDelegateTo=cifs/{{ ad_dc_fqdn }}</code>. Este lab demuestra el impacto accediendo directamente con las credenciales de <code>svc.delegate</code> — la cuenta que, en un dominio real, usarías con <code>impacket-getST</code> para suplantar a cualquier usuario frente a ese servicio.</p>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Note about this Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">S4U2Self and S4U2Proxy are, at the protocol level, variants of TGS-REQ that Samba's embedded KDC does not reliably complete with current tooling (the same limitation affecting Kerberoasting). The delegation configuration is <strong>real and auditable via LDAP</strong>: <code>svc.delegate</code> has <code>TRUSTED_TO_AUTH_FOR_DELEGATION</code> and <code>msDS-AllowedToDelegateTo=cifs/{{ ad_dc_fqdn }}</code>. This lab demonstrates the impact by directly accessing resources with <code>svc.delegate</code>'s credentials — the exact account you would use in a real domain with <code>impacket-getST</code> to impersonate any user towards that service.</p>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">O S4U2Self e o S4U2Proxy são, a nível de protocolo, variantes do TGS-REQ que o KDC integrado do Samba não conclui de maneira confiável com as ferramentas atuais (a mesma limitação que afeta o Kerberoasting). A configuração de delegação é <strong>real e auditável via LDAP</strong>: <code>svc.delegate</code> possui <code>TRUSTED_TO_AUTH_FOR_DELEGATION</code> e <code>msDS-AllowedToDelegateTo=cifs/{{ ad_dc_fqdn }}</code>. Este laboratório demonstra o impacto acessando diretamente com as credenciais de <code>svc.delegate</code> — a conta exata que, em um domínio corporativo real, você usaria com o <code>impacket-getST</code> para personificar qualquer usuário perante esse serviço.</p>
+    </div>
   </div>
 
   <div class="hl-card mb-4">

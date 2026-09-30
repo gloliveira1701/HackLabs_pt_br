@@ -13,8 +13,18 @@
   {% include 'labs/_ad_target.html' %}
 
   <div class="hl-card mb-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
-    <p class="text-sm text-gray-600 dark:text-gray-400">Un Golden Ticket forjado correctamente pasaría la validación de un DC real (usa la clave legítima de krbtgt). El bloqueo aquí es distinto: para <em>usar</em> el TGT contra un recurso SMB hace falta un TGS-REQ adicional al KDC, y el KDC embebido de Samba tiene incompatibilidades conocidas con esa fase del protocolo en los clientes actuales (impacket, la misma limitación que afecta a Kerberoasting). Para demostrar el forjado con la misma precisión criptográfica, este lab valida el ticket <strong>descifrándolo localmente</strong> con la clave de krbtgt — la misma prueba matemática que hace que el ataque comprometa el dominio en producción.</p>
+    <div class="lang-content" data-lang="es">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">Un Golden Ticket forjado correctamente pasaría la validación de un DC real (usa la clave legítima de krbtgt). El bloqueo aquí es distinto: para <em>usar</em> el TGT contra un recurso SMB hace falta un TGS-REQ adicional al KDC, y el KDC embebido de Samba tiene incompatibilidades conocidas con esa fase del protocolo en los clientes actuales (impacket, la misma limitación que afecta a Kerberoasting). Para demostrar el forjado con la misma precisión criptográfica, este lab valida el ticket <strong>descifrándolo localmente</strong> con la clave de krbtgt — la misma prueba matemática que hace que el ataque comprometa el dominio en producción.</p>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Note about this Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">A properly forged Golden Ticket would pass validation on a real DC (it uses krbtgt's legitimate key). The obstacle here is different: to <em>use</em> the TGT against an SMB resource, an additional TGS-REQ to the KDC is required, and Samba's embedded KDC has known incompatibilities with that protocol phase in current tooling (impacket, the same limitation affecting Kerberoasting). To demonstrate the forgery with the same cryptographic rigor, this lab validates the ticket by <strong>decrypting it locally</strong> with the krbtgt key — the very same mathematical proof that makes this attack fully compromise a domain in production.</p>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">Um Golden Ticket forjado corretamente passaria na validação de um DC real (ele utiliza a chave legítima do krbtgt). O obstáculo aqui é diferente: para <em>usar</em> o TGT contra um recurso SMB, é necessária uma requisição TGS-REQ adicional ao KDC, e o KDC integrado do Samba possui incompatibilidades conhecidas com essa fase do protocolo nas ferramentas atuais (impacket, a mesma limitação que afeta o Kerberoasting). Para demonstrar a forja com o mesmo rigor criptográfico, este laboratório valida o ticket <strong>descriptografando-o localmente</strong> com a chave do krbtgt — a mesma prova matemática que faz com que esse ataque comprometa totalmente o domínio em produção.</p>
+    </div>
   </div>
 
   <div class="hl-card mb-4">

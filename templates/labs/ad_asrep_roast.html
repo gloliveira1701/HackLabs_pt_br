@@ -13,8 +13,18 @@
   {% include 'labs/_ad_target.html' %}
 
   <div class="hl-card mb-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
-    <p class="text-sm text-gray-600 dark:text-gray-400">El KDC embebido de Samba tiene una limitación conocida: no siempre completa en vivo el intercambio AS-REQ/AS-REP para cuentas con <code>DONT_REQ_PREAUTH</code>, aunque el atributo esté correctamente configurado (verificable por LDAP). Los comandos de <code>impacket-GetNPUsers</code> de abajo son exactamente los que usarías contra un Domain Controller Windows real. Para que el ejercicio de <em>cracking</em> sea idéntico al de una red real, el hash ya ha sido "capturado" y publicado en <code>//{{ ad_dc_host }}/public/captured_asrep.txt</code> — es un hash válido y crackeable generado con las mismas primitivas criptográficas de Kerberos.</p>
+    <div class="lang-content" data-lang="es">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">El KDC embebido de Samba tiene una limitación conocida: no siempre completa en vivo el intercambio AS-REQ/AS-REP para cuentas con <code>DONT_REQ_PREAUTH</code>, aunque el atributo esté correctamente configurado (verificable por LDAP). Los comandos de <code>impacket-GetNPUsers</code> de abajo son exactamente los que usarías contra un Domain Controller Windows real. Para que el ejercicio de <em>cracking</em> sea idéntico al de una red real, el hash ya ha sido "capturado" y publicado en <code>//{{ ad_dc_host }}/public/captured_asrep.txt</code> — es un hash válido y crackeable generado con las mismas primitivas criptográficas de Kerberos.</p>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Note about this Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">The embedded Samba KDC has a known limitation: it does not always complete the live AS-REQ/AS-REP exchange for accounts with <code>DONT_REQ_PREAUTH</code>, even though the attribute is properly set (verifiable via LDAP). The <code>impacket-GetNPUsers</code> commands below are exactly what you would run against a real Windows Domain Controller. To ensure the <em>cracking</em> exercise is identical to a real network scenario, the hash has been pre-captured and published in <code>//{{ ad_dc_host }}/public/captured_asrep.txt</code> — it is a valid, crackable hash generated with genuine Kerberos cryptographic primitives.</p>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">O KDC integrado do Samba possui uma limitação conhecida: nem sempre conclui ao vivo a troca AS-REQ/AS-REP para contas com <code>DONT_REQ_PREAUTH</code>, mesmo que o atributo esteja configurado corretamente (verificável via LDAP). Os comandos do <code>impacket-GetNPUsers</code> abaixo são exatamente os que você utilizaria contra um Domain Controller Windows real. Para que o exercício de <em>cracking</em> seja idêntico ao de uma rede corporativa real, o hash já foi "capturado" e publicado em <code>//{{ ad_dc_host }}/public/captured_asrep.txt</code> — trata-se de um hash válido e crackeável gerado com as mesmas primitivas criptográficas do Kerberos.</p>
+    </div>
   </div>
 
   <div class="hl-card mb-4">

@@ -42,12 +42,32 @@
     </div>
   </div>
 
+  <!-- Scenario banner PT -->
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <div class="flex items-start gap-3 p-4 rounded-xl mb-6 text-sm"
+         style="background:rgba(var(--hl-primary-rgb),.08);border:1px solid rgba(var(--hl-primary-rgb),.2)">
+      <i class="ph ph-arrows-in text-lg flex-shrink-0 mt-0.5" style="color:var(--hl-primary)"></i>
+      <div>
+        <p class="font-semibold mb-1" style="color:var(--hl-primary)">Cenário: Analisador de documentos com IA</p>
+        <p class="text-gray-600 dark:text-gray-400">
+          Este sistema usa um LLM para <strong>resumir documentos internos</strong>. No entanto, se um documento
+          contiver instruções ocultas, o modelo as executará sem perceber — isso é uma injeção indireta.
+        </p>
+        <p class="mt-2 text-xs text-gray-500">
+          <i class="ph ph-lightbulb mr-1" style="color:var(--hl-primary)"></i>
+          Analise os documentos disponíveis. Um deles contém um payload de injeção oculto.
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- Document selector -->
   <div class="hl-card mb-4">
     <div class="text-xs font-semibold uppercase tracking-wider mb-4" style="color:var(--hl-primary)">
       <i class="ph ph-files mr-1"></i>
       <span class="lang-content" data-lang="es">Documentos disponibles</span>
       <span class="lang-content" data-lang="en" style="display:none">Available documents</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Documentos disponíveis</span>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
@@ -62,6 +82,7 @@
             <span class="font-semibold text-xs" style="color:var(--hl-primary)">
               <span class="lang-content" data-lang="es">Documento</span>
               <span class="lang-content" data-lang="en" style="display:none">Document</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Documento</span>
               {{ doc_id }}
             </span>
           </div>
@@ -77,6 +98,7 @@
         <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
           <span class="lang-content" data-lang="es">… o pega tu propio documento:</span>
           <span class="lang-content" data-lang="en" style="display:none">… or paste your own document:</span>
+          <span class="lang-content" data-lang="pt" style="display:none">… ou cole seu próprio documento:</span>
         </label>
         <div class="flex flex-wrap gap-1.5 mb-2">
           {% for pt in payload_templates %}
@@ -95,6 +117,7 @@
         <i class="ph ph-magnifying-glass text-sm"></i>
         <span class="lang-content" data-lang="es">Analizar documento</span>
         <span class="lang-content" data-lang="en" style="display:none">Analyse document</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Analisar documento</span>
       </button>
     </form>
   </div>
@@ -131,6 +154,7 @@
       <i class="ph ph-robot"></i>
       <span class="lang-content" data-lang="es">Resultado del análisis IA</span>
       <span class="lang-content" data-lang="en" style="display:none">AI analysis result</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Resultado da análise da IA</span>
     </div>
     <div class="font-mono text-sm {% if result.success %}text-yellow-400{% else %}text-gray-300{% endif %} whitespace-pre-wrap">
       {{ result.text }}

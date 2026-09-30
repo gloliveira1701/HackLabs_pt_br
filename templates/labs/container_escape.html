@@ -11,23 +11,46 @@
   {% endwith %}
 
   <div class="hl-card mb-4">
-    <h2 class="font-semibold text-sm mb-3">Descripcion del lab</h2>
-    <p class="text-sm text-gray-300 mb-3">Este laboratorio usa un escenario Docker-in-Docker aislado para practicar Container Escape sin depender del contenedor principal de HackLabs.</p>
-    <p class="text-sm text-gray-300 mb-4">Objetivo: entrar al contenedor victima, validar acceso al socket Docker y ejecutar tecnicas de escape sobre el host del escenario ad-hoc.</p>
-
-    <div class="text-xs text-gray-400 mb-2">Inicio rapido</div>
-    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Levanta el entorno ad-hoc aislado (desde la carpeta del proyecto)
+    <div class="lang-content" data-lang="es">
+      <h2 class="font-semibold text-sm mb-3">Descripción del lab</h2>
+      <p class="text-sm text-gray-300 mb-3">Este laboratorio usa un escenario Docker-in-Docker aislado para practicar Container Escape sin depender del contenedor principal de HackLabs.</p>
+      <p class="text-sm text-gray-300 mb-4">Objetivo: entrar al contenedor víctima, validar acceso al socket Docker y ejecutar técnicas de escape sobre el host del escenario ad-hoc.</p>
+      <div class="text-xs text-gray-400 mb-2">Inicio rápido</div>
+      <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Levanta el entorno ad-hoc aislado (desde la carpeta del proyecto)
 docker compose -f docker-compose.docker-escape.yml up -d --build
 
-# 2) Entra al contenedor victima del lab
+# 2) Entra al contenedor víctima del lab
 docker exec -it hacklabs-escape-victim sh</pre>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h2 class="font-semibold text-sm mb-3">Lab Description</h2>
+      <p class="text-sm text-gray-300 mb-3">This lab uses an isolated Docker-in-Docker environment to practice Container Escape without relying on the main HackLabs container.</p>
+      <p class="text-sm text-gray-300 mb-4">Objective: access the victim container, verify access to the Docker socket, and execute escape techniques targeting the host of the ad-hoc environment.</p>
+      <div class="text-xs text-gray-400 mb-2">Quick Start</div>
+      <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Start the isolated ad-hoc environment (from the project root)
+docker compose -f docker-compose.docker-escape.yml up -d --build
+
+# 2) Enter the lab victim container
+docker exec -it hacklabs-escape-victim sh</pre>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h2 class="font-semibold text-sm mb-3">Descrição do laboratório</h2>
+      <p class="text-sm text-gray-300 mb-3">Este laboratório usa um cenário Docker-in-Docker isolado para praticar Fuga de Container (Container Escape) sem depender do container principal do HackLabs.</p>
+      <p class="text-sm text-gray-300 mb-4">Objetivo: acessar o container vítima, validar o acesso ao socket Docker e executar técnicas de escape no host do cenário ad-hoc.</p>
+      <div class="text-xs text-gray-400 mb-2">Início rápido</div>
+      <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Inicie o ambiente ad-hoc isolado (a partir da pasta do projeto)
+docker compose -f docker-compose.docker-escape.yml up -d --build
+
+# 2) Acesse o container vítima do lab
+docker exec -it hacklabs-escape-victim sh</pre>
+    </div>
   </div>
 
   <div class="hl-card mb-4">
-    <h2 class="font-semibold text-sm mb-4" data-i18n="container_recon">Reconocimiento del contenedor victima</h2>
-
-    <p class="text-sm text-gray-300 mb-3">Ejecuta estas comprobaciones dentro de <code>hacklabs-escape-victim</code> para confirmar que el entorno de explotacion esta listo:</p>
-    <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Confirmar contenedor
+    <div class="lang-content" data-lang="es">
+      <h2 class="font-semibold text-sm mb-4">Reconocimiento del contenedor víctima</h2>
+      <p class="text-sm text-gray-300 mb-3">Ejecuta estas comprobaciones dentro de <code>hacklabs-escape-victim</code> para confirmar que el entorno de explotación está listo:</p>
+      <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Confirmar contenedor
 ls /.dockerenv &amp;&amp; echo "DENTRO del contenedor"
 
 # 2) Confirmar socket Docker
@@ -38,7 +61,40 @@ curl --unix-socket /var/run/docker.sock http://localhost/_ping
 
 # 4) Confirmar CLI Docker
 which docker</pre>
-    <p class="text-xs text-gray-400 mt-2">Nota: el host accesible tras el escape es el del escenario ad-hoc aislado, no el sistema operativo principal que ejecuta HackLabs.</p>
+      <p class="text-xs text-gray-400 mt-2">Nota: el host accesible tras el escape es el del escenario ad-hoc aislado, no el sistema operativo principal que ejecuta HackLabs.</p>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h2 class="font-semibold text-sm mb-4">Victim Container Reconnaissance</h2>
+      <p class="text-sm text-gray-300 mb-3">Run these checks inside <code>hacklabs-escape-victim</code> to confirm the exploitation environment is ready:</p>
+      <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Confirm container
+ls /.dockerenv &amp;&amp; echo "INSIDE the container"
+
+# 2) Confirm Docker socket
+ls -la /var/run/docker.sock
+
+# 3) Confirm Docker daemon
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+
+# 4) Confirm Docker CLI
+which docker</pre>
+      <p class="text-xs text-gray-400 mt-2">Note: the accessible host after the escape is that of the isolated ad-hoc environment, not the host OS running HackLabs.</p>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h2 class="font-semibold text-sm mb-4">Reconhecimento do container vítima</h2>
+      <p class="text-sm text-gray-300 mb-3">Execute estas verificações dentro de <code>hacklabs-escape-victim</code> para confirmar que o ambiente de exploração está pronto:</p>
+      <pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto rounded-lg px-3 py-2.5" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)"># 1) Confirmar container
+ls /.dockerenv &amp;&amp; echo "DENTRO do container"
+
+# 2) Confirmar socket Docker
+ls -la /var/run/docker.sock
+
+# 3) Confirmar daemon Docker
+curl --unix-socket /var/run/docker.sock http://localhost/_ping
+
+# 4) Confirmar CLI Docker
+which docker</pre>
+      <p class="text-xs text-gray-400 mt-2">Nota: o host acessível após a fuga é o do cenário ad-hoc isolado, não o sistema operacional principal que executa o HackLabs.</p>
+    </div>
   </div>
 </div>
 

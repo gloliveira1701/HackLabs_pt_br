@@ -31,6 +31,19 @@
         {% else %}Hard: session fixation by reusing attacker-injected SID.{% endif %}
       </p>
     </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        Esta aplicação alvo identifica a sua sessão por meio de um único cookie, <code>hl_hijack_sid</code>. Existem duas formas de obter um valor para ele: iniciando sessão normalmente (a aplicação o atribui) ou definindo-o você mesmo manualmente — da mesma forma que um invasor que adivinhou, forjou ou interceptou a sessão de outra pessoa faria sem saber a senha.
+      </p>
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+        <strong>Objetivo:</strong> faça com que a caixa "Current Session" (ao final da página) exiba o usuário <code>admin</code> como identidade ativa, sem nunca digitar a senha real dele no formulário de login.
+      </p>
+      <p class="text-xs text-gray-500">
+        {% if difficulty == 'easy' %}Easy: SID previsível (<code>SID-username-2024</code>).
+        {% elif difficulty == 'medium' %}Medium: token base64 sem assinatura.
+        {% else %}Hard: fixação de sessão ao reutilizar o SID injetado pelo atacante.{% endif %}
+      </p>
+    </div>
   </div>
 
   {% if fixation_notice %}
@@ -54,6 +67,7 @@
     <h2 class="text-sm font-semibold mb-1" style="color:var(--hl-primary)">Login Target App</h2>
     <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="es">Inicia sesión de verdad con una cuenta de prueba cualquiera. El servidor te devolverá un SID válido en la cookie <code>hl_hijack_sid</code> — míralo abajo, en "Current Session", para entender cómo lo construye.</p>
     <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="en" style="display:none">Log in for real with any test account. The server will hand you back a valid SID in the <code>hl_hijack_sid</code> cookie — check "Current Session" below to see how it's built.</p>
+    <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="pt" style="display:none">Inicie sessão normalmente com qualquer conta de teste. O servidor retornará um SID válido no cookie <code>hl_hijack_sid</code> — observe abaixo em "Current Session" para entender como ele é construído.</p>
     <form method="POST" action="/session-hijacking/login" class="space-y-3">
       <div>
         <label class="block text-xs text-gray-500 mb-1" data-i18n="lbl_username">Usuario</label>
@@ -71,6 +85,7 @@
     <h2 class="text-sm font-semibold mb-1" style="color:var(--hl-primary)">Reuse / Inject Session ID</h2>
     <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="es">Este campo <strong>no comprueba ninguna contraseña</strong>: lo que escribas se guarda tal cual en tu cookie <code>hl_hijack_sid</code>, sustituyendo la que tuvieras. Es el equivalente a editar la cookie a mano en el navegador o con Burp. Úsalo para probar un SID que hayas deducido, forjado o adivinado sin haber iniciado sesión con esas credenciales.</p>
     <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="en" style="display:none">This field <strong>checks no password at all</strong>: whatever you type is saved as-is into your <code>hl_hijack_sid</code> cookie, replacing whatever was there. It's the same as editing the cookie by hand in the browser or in Burp. Use it to try out a SID you've inferred, forged, or guessed without ever logging in with those credentials.</p>
+    <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="pt" style="display:none">Este campo <strong>não verifica nenhuma senha</strong>: o que você digitar será salvo exatamente assim no seu cookie <code>hl_hijack_sid</code>, substituindo o que estiver lá. É o equivalente a editar o cookie manualmente no navegador ou via Burp. Use-o para testar um SID que você deduziu, forjou ou adivinhou sem nunca ter feito login com essas credenciais.</p>
     <form method="POST" action="/session-hijacking/use" class="space-y-3">
       <div>
         <label class="block text-xs text-gray-500 mb-1">Session ID</label>
@@ -89,6 +104,7 @@
     </div>
     <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="es">Esto es lo que el servidor entiende ahora mismo a partir de tu cookie <code>hl_hijack_sid</code> actual — sea porque iniciaste sesión de verdad o porque la inyectaste arriba. Cuando aquí aparezca <code>admin</code>, revisa si arriba apareció la caja verde con la flag.</p>
     <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="en" style="display:none">This is what the server currently believes based on your active <code>hl_hijack_sid</code> cookie — whether you logged in for real or injected it above. Once this shows <code>admin</code>, check whether the green flag box appeared above.</p>
+    <p class="text-xs text-gray-500 mb-3 lang-content" data-lang="pt" style="display:none">Isto é o que o servidor reconhece agora a partir do seu cookie <code>hl_hijack_sid</code> ativo — seja porque você fez login de verdade ou porque o injetou acima. Quando aparecer <code>admin</code> aqui, verifique se a caixa verde com a flag surgiu acima.</p>
 
     {% if identity %}
     <div class="space-y-1 text-sm">

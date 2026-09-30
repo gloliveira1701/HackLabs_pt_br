@@ -28,6 +28,17 @@
         </p>
         {% endif %}
       </div>
+      <div class="lang-content" data-lang="pt" style="display:none">
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+          Sistema de login com segundo fator (OTP). Encontre uma maneira de burlar o 2FA
+          sem conhecer o código legítimo — ou obtendo-o por um canal lateral.
+        </p>
+        {% if step == 'login' %}
+        <p class="text-xs text-gray-500 mt-1">
+          Usuários disponíveis: <code>admin / password1</code> &nbsp;|&nbsp; <code>alice / alice123</code> &nbsp;|&nbsp; <code>bob / password123</code>
+        </p>
+        {% endif %}
+      </div>
     </div>
   </div>
 
@@ -36,6 +47,7 @@
     <h2 class="text-sm font-semibold mb-4" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">Paso 1 — Credenciales</span>
       <span class="lang-content" data-lang="en" style="display:none">Step 1 — Credentials</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Passo 1 — Credenciais</span>
     </h2>
     {% if error %}
     <div class="mb-3 text-xs text-red-400 font-mono">{{ error }}</div>
@@ -52,6 +64,7 @@
       <button type="submit" class="btn-primary">
         <span class="lang-content" data-lang="es">Iniciar sesión</span>
         <span class="lang-content" data-lang="en" style="display:none">Log in</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Iniciar sessão</span>
       </button>
     </form>
   </div>
@@ -63,6 +76,7 @@
     <div class="text-sm font-semibold text-green-400 mb-1">
       <span class="lang-content" data-lang="es">2FA bypasseado</span>
       <span class="lang-content" data-lang="en" style="display:none">2FA bypassed</span>
+      <span class="lang-content" data-lang="pt" style="display:none">2FA burlado</span>
     </div>
     <code class="text-sm font-mono text-green-400">{{ flag }}</code>
   </div>
@@ -74,6 +88,7 @@
     <div class="text-xs text-gray-400 mb-4 font-medium" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">Segundo factor — código enviado al móvil</span>
       <span class="lang-content" data-lang="en" style="display:none">Second factor — code sent to mobile</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Segundo fator — código enviado ao celular</span>
     </div>
     <div style="border:2px solid #2d3748;border-radius:20px;padding:20px 16px;max-width:200px;margin:0 auto;text-align:center;background:#0d1117">
       <div style="width:40px;height:4px;background:#2d3748;border-radius:2px;margin:0 auto 16px"></div>
@@ -81,6 +96,7 @@
       <div style="font-size:11px;color:#718096;margin-bottom:10px">
         <span class="lang-content" data-lang="es">Tu código de verificación:</span>
         <span class="lang-content" data-lang="en" style="display:none">Your verification code:</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Seu código de verificação:</span>
       </div>
       <div style="font-size:{% if difficulty == 'medium' %}28{% else %}24{% endif %}px;font-weight:700;letter-spacing:{% if difficulty == 'medium' %}8{% else %}5{% endif %}px;color:#22c55e;font-family:monospace;padding:0 4px">
         {% if difficulty == 'easy' %}
@@ -96,11 +112,13 @@
     <p class="text-xs text-yellow-600 text-center mt-3">
       <span class="lang-content" data-lang="es">Tip: revisa las cabeceras de respuesta HTTP y el código fuente de esta página.</span>
       <span class="lang-content" data-lang="en" style="display:none">Tip: check the HTTP response headers and the page source.</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Dica: verifique os cabeçalhos de resposta HTTP e o código-fonte desta página.</span>
     </p>
     {% elif difficulty == 'hard' %}
     <p class="text-xs text-yellow-600 text-center mt-3">
       <span class="lang-content" data-lang="es">Tip: en hard la validación OTP compara solo el prefijo del código.</span>
       <span class="lang-content" data-lang="en" style="display:none">Tip: in hard mode OTP validation compares only the code prefix.</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Dica: no modo difícil a validação OTP compara apenas o prefixo do código.</span>
     </p>
     {% endif %}
   </div>
@@ -110,6 +128,7 @@
     <h2 class="text-sm font-semibold mb-4" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">Paso 2 — Código OTP</span>
       <span class="lang-content" data-lang="en" style="display:none">Step 2 — OTP Code</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Passo 2 — Código OTP</span>
     </h2>
     {% if error %}
     <div class="mb-3 text-xs text-red-400 font-mono">{{ error }}</div>
@@ -120,6 +139,7 @@
       <div class="text-xs text-gray-500">
         <span class="lang-content" data-lang="es">Código expira en:</span>
         <span class="lang-content" data-lang="en" style="display:none">Code expires in:</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Código expira em:</span>
       </div>
       <div id="countdown" style="font-family:monospace;font-size:13px;font-weight:700;color:#22c55e">0:30</div>
       <div id="countdown-bar" style="flex:1;height:4px;background:#1f2937;border-radius:2px;overflow:hidden">
@@ -132,6 +152,7 @@
         <label class="block text-xs text-gray-500 mb-1">
           <span class="lang-content" data-lang="es">Introduce el código OTP ({{ state.code|length }} dígitos)</span>
           <span class="lang-content" data-lang="en" style="display:none">Enter OTP code ({{ state.code|length }} digits)</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Insira o código OTP ({{ state.code|length }} dígitos)</span>
         </label>
         <input type="text" name="otp"
                maxlength="{{ state.code|length }}"
@@ -139,7 +160,11 @@
                autocomplete="off" inputmode="numeric"
                style="letter-spacing:0.3em;font-size:20px">
       </div>
-      <button type="submit" class="btn-primary w-full">Verify</button>
+      <button type="submit" class="btn-primary w-full">
+        <span class="lang-content" data-lang="es">Verificar</span>
+        <span class="lang-content" data-lang="en" style="display:none">Verify</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Verificar</span>
+      </button>
     </form>
   </div>
 
@@ -148,6 +173,7 @@
             style="background:rgba(255,255,255,.05);color:#6b7280;border:1px solid rgba(255,255,255,.1)">
       <span class="lang-content" data-lang="es">Reiniciar lab</span>
       <span class="lang-content" data-lang="en" style="display:none">Reset lab</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Reiniciar lab</span>
     </button>
   </form>
 
@@ -158,6 +184,7 @@
       <button type="submit" class="btn-primary">
         <span class="lang-content" data-lang="es">Volver al inicio</span>
         <span class="lang-content" data-lang="en" style="display:none">Back to start</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Voltar ao início</span>
       </button>
     </form>
   </div>

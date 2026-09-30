@@ -70,6 +70,39 @@
     </div>
   </div>
 
+  <!-- Info banner PT -->
+  <div class="lang-content" data-lang="pt" style="display:none">
+    <div class="flex items-start gap-3 p-4 rounded-xl mb-6 text-sm"
+         style="background:rgba(var(--hl-primary-rgb),.08);border:1px solid rgba(var(--hl-primary-rgb),.2)">
+      <i class="ph ph-info text-lg flex-shrink-0 mt-0.5" style="color:var(--hl-primary)"></i>
+      <div>
+        <p class="font-semibold mb-1" style="color:var(--hl-primary)">Como funciona este laboratório?</p>
+        <p class="text-gray-600 dark:text-gray-400">
+          Conecte-se por SSH usando qualquer um dos 5 usuários do sistema. Cada um possui um vetor de
+          escalada de privilégios diferente. O objetivo é obter acesso <strong>root</strong> e ler
+          <code class="font-mono text-xs px-1 py-0.5 rounded" style="background:rgba(0,0,0,.2)">/root/root.txt</code>.
+        </p>
+        <p class="mt-2 text-gray-500 dark:text-gray-500 text-xs">
+          O usuário <strong>admin</strong> possui <code class="font-mono">sudo</code> total — utilize-o para
+          inspecionar a máquina: permissões SUID, entradas no sudoers, cron jobs...
+        </p>
+      </div>
+    </div>
+    <div class="hl-card mb-6">
+      <div class="text-xs font-semibold uppercase tracking-wider mb-3" style="color:var(--hl-primary)">
+        <i class="ph ph-terminal-window mr-1"></i> Conexão SSH
+      </div>
+      <div class="hl-code text-xs space-y-1">
+        <div class="text-gray-400"># Conectar via SSH — substitua {{ target_ip }} pelo IP do laboratório</div>
+        <div>ssh admin@{{ target_ip }}      <span class="text-gray-500"># senha: password1 (sudo total)</span></div>
+        <div>ssh alice@{{ target_ip }}      <span class="text-gray-500"># senha: Password1</span></div>
+        <div>ssh bob@{{ target_ip }}        <span class="text-gray-500"># senha: welcome1</span></div>
+        <div>ssh charlie@{{ target_ip }}    <span class="text-gray-500"># senha: changeme</span></div>
+        <div>ssh dave@{{ target_ip }}       <span class="text-gray-500"># senha: P@ssw0rd</span></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 

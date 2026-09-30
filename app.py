@@ -3983,10 +3983,12 @@ CAPTCHA_ERROR_MESSAGES = {
     'captcha': {
         'es': 'Error: CAPTCHA incorrecto!',
         'en': 'Error: CAPTCHA incorrect!',
+        'pt': 'Erro: CAPTCHA incorreto!',
     },
     'credentials': {
         'es': 'Error: el password debe tener 5 caracteres y el character set a,x,4,M,]',
         'en': 'Error: the password must have 5 characters and use the character set a,x,4,M,]',
+        'pt': 'Erro: a senha deve ter 5 caracteres e usar o conjunto de caracteres a,x,4,M,]',
     },
 }
 

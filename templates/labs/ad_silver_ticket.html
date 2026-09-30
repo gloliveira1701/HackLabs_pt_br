@@ -13,8 +13,18 @@
   {% include 'labs/_ad_target.html' %}
 
   <div class="hl-card mb-4">
-    <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
-    <p class="text-sm text-gray-600 dark:text-gray-400">En este laboratorio de un único DC, el propio Domain Controller aloja el servicio objetivo (CIFS) — y a diferencia de un servidor miembro normal, un DC <strong>tiene acceso al hash de krbtgt</strong> y valida estrictamente la firma PAC de cualquier ticket presentado, incluso los forjados. Por eso <code>smbclient -k</code> con un Silver Ticket será rechazado aquí, aunque el ticket esté perfectamente forjado (en un servidor miembro real, sin acceso a krbtgt, el mismo ticket sería aceptado sin más). Para demostrar el forjado con la misma precisión criptográfica, este lab valida el ticket <strong>descifrándolo localmente</strong> con la clave de DC01$ — la misma prueba matemática que hace que el ataque funcione en producción.</p>
+    <div class="lang-content" data-lang="es">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">En este laboratorio de un único DC, el propio Domain Controller aloja el servicio objetivo (CIFS) — y a diferencia de un servidor miembro normal, un DC <strong>tiene acceso al hash de krbtgt</strong> y valida estrictamente la firma PAC de cualquier ticket presentado, incluso los forjados. Por eso <code>smbclient -k</code> con un Silver Ticket será rechazado aquí, aunque el ticket esté perfectamente forjado (en un servidor miembro real, sin acceso a krbtgt, el mismo ticket sería aceptado sin más). Para demostrar el forjado con la misma precisión criptográfica, este lab valida el ticket <strong>descifrándolo localmente</strong> con la clave de DC01$ — la misma prueba matemática que hace que el ataque funcione en producción.</p>
+    </div>
+    <div class="lang-content" data-lang="en" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Note about this Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">In this single-DC lab, the Domain Controller itself hosts the target service (CIFS) — and unlike a normal member server, a DC <strong>has access to the krbtgt hash</strong> and strictly verifies the PAC signature of any presented ticket, including forged ones. That is why <code>smbclient -k</code> with a Silver Ticket will be rejected here, even though the ticket is flawlessly forged (on a real member server without access to krbtgt, the exact same ticket would be accepted). To demonstrate the forgery with the same cryptographic precision, this lab validates the ticket by <strong>decrypting it locally</strong> with DC01$'s key — the same mathematical proof that makes the attack work in production.</p>
+    </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <h3 class="text-xs font-semibold uppercase tracking-wider mb-2 text-amber-500"><i class="ph ph-warning"></i> Nota sobre este Domain Controller</h3>
+      <p class="text-sm text-gray-600 dark:text-gray-400">Neste laboratório de DC único, o próprio Domain Controller hospeda o serviço alvo (CIFS) — e, diferentemente de um servidor membro padrão, um DC <strong>possui acesso ao hash do krbtgt</strong> e valida rigorosamente a assinatura do PAC de qualquer ticket apresentado, incluindo tickets forjados. Por isso, o comando <code>smbclient -k</code> com um Silver Ticket será rejeitado aqui, mesmo que o ticket esteja perfeitamente forjado (em um servidor membro real sem acesso ao krbtgt, esse mesmo ticket seria aceito sem problemas). Para demonstrar a técnica com a mesma precisão criptográfica, este laboratório valida o ticket <strong>descriptografando-o localmente</strong> com a chave do DC01$ — a mesma prova matemática que faz esse ataque funcionar em ambientes de produção.</p>
+    </div>
   </div>
 
   <div class="hl-card mb-4">

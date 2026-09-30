@@ -25,6 +25,16 @@
         {% else %}Hard: full HTML escaping before render.{% endif %}
       </p>
     </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">
+        Este laboratório simula injeção de HTML em três superfícies: <code>GET</code>, <code>POST</code> e <code>Stored</code> em blog interno.
+      </p>
+      <p class="text-xs text-gray-500">
+        {% if difficulty == 'easy' %}Easy: sem filtros.
+        {% elif difficulty == 'medium' %}Medium: bloqueia <code>&lt;script&gt;</code> e <code>on*=</code>, mas renderiza HTML.
+        {% else %}Hard: escape completo de HTML antes de renderizar.{% endif %}
+      </p>
+    </div>
   </div>
 
   <div class="flex gap-1 mb-5 bg-gray-100 dark:bg-dark-800 p-1 rounded-lg border border-gray-200 dark:border-gray-700 w-fit">

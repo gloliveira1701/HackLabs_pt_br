@@ -16,6 +16,12 @@
           The goal is to analyze the authentication flow, automate CAPTCHA solving and recover access as <code>admin</code> to review simulated sensitive data.
         </p>
       </div>
+      <div class="lang-content" data-lang="pt" style="display:none">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          Este laboratório simula um login de internet banking protegido por um CAPTCHA matemático.
+          O objetivo é analisar o fluxo de autenticação, automatizar a resolução do CAPTCHA e recuperar o acesso como <code>admin</code> para analisar dados sensíveis simulados.
+        </p>
+      </div>
     </div>
   </div>
   {% endif %}
@@ -24,6 +30,7 @@
     <h2 class="text-sm font-semibold mb-4" style="color:var(--hl-primary)">
       <span class="lang-content" data-lang="es">Banca online</span>
       <span class="lang-content" data-lang="en" style="display:none">Online banking</span>
+      <span class="lang-content" data-lang="pt" style="display:none">Internet Banking</span>
     </h2>
 
     {% if error_key %}
@@ -31,6 +38,7 @@
       <i class="ph ph-warning-circle mt-0.5"></i>
       <span class="lang-content" data-lang="es">{{ captcha_error_messages[error_key]['es'] }}</span>
       <span class="lang-content" data-lang="en" style="display:none">{{ captcha_error_messages[error_key]['en'] }}</span>
+      <span class="lang-content" data-lang="pt" style="display:none">{{ captcha_error_messages[error_key]['pt'] }}</span>
     </div>
     {% elif error %}
     <div class="mb-4 alert-error flex items-start gap-2">
@@ -44,6 +52,7 @@
       <div class="text-xs font-semibold">
         <span class="lang-content" data-lang="es">Login correcto</span>
         <span class="lang-content" data-lang="en" style="display:none">Login successful</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Login bem-sucedido</span>
       </div>
     </div>
 
@@ -54,6 +63,7 @@
             <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
               <span class="lang-content" data-lang="es">Cliente premium</span>
               <span class="lang-content" data-lang="en" style="display:none">Premium client</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Cliente premium</span>
             </p>
             <h3 class="font-display text-xl font-bold text-gray-900 dark:text-white">Admin Root</h3>
           </div>
@@ -67,6 +77,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
               <span class="lang-content" data-lang="es">Saldo disponible</span>
               <span class="lang-content" data-lang="en" style="display:none">Available balance</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Saldo disponível</span>
             </p>
             <p class="font-mono text-lg font-bold" style="color:var(--hl-primary)">1,284,920.44 EUR</p>
           </div>
@@ -78,6 +89,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
               <span class="lang-content" data-lang="es">Tarjeta principal</span>
               <span class="lang-content" data-lang="en" style="display:none">Primary card</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Cartão principal</span>
             </p>
             <p class="font-mono text-sm text-gray-100">4539 1488 0343 6467</p>
             <p class="font-mono text-xs text-gray-500 mt-1">Exp 09/29 &middot; CVV 731</p>
@@ -86,6 +98,7 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">
               <span class="lang-content" data-lang="es">Cuenta de ahorro</span>
               <span class="lang-content" data-lang="en" style="display:none">Savings account</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Conta poupança</span>
             </p>
             <p class="font-mono text-sm text-gray-100">ES72 0081 1739 0001 2194 4128</p>
             <p class="font-mono text-xs text-gray-500 mt-1">482,310.90 EUR</p>
@@ -99,14 +112,17 @@
                 <th class="py-2 pr-3 font-semibold">
                   <span class="lang-content" data-lang="es">Fecha</span>
                   <span class="lang-content" data-lang="en" style="display:none">Date</span>
+                  <span class="lang-content" data-lang="pt" style="display:none">Data</span>
                 </th>
                 <th class="py-2 pr-3 font-semibold">
                   <span class="lang-content" data-lang="es">Concepto</span>
                   <span class="lang-content" data-lang="en" style="display:none">Description</span>
+                  <span class="lang-content" data-lang="pt" style="display:none">Descrição</span>
                 </th>
                 <th class="py-2 text-right font-semibold">
                   <span class="lang-content" data-lang="es">Importe</span>
                   <span class="lang-content" data-lang="en" style="display:none">Amount</span>
+                  <span class="lang-content" data-lang="pt" style="display:none">Valor</span>
                 </th>
               </tr>
             </thead>
@@ -123,6 +139,7 @@
         <div class="text-xs font-semibold mb-1" style="color:var(--hl-primary)">
           <span class="lang-content" data-lang="es">Flag localizada</span>
           <span class="lang-content" data-lang="en" style="display:none">Flag found</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Flag localizada</span>
         </div>
         <code class="text-sm break-all">{{ flag }}</code>
       </div>
@@ -135,6 +152,7 @@
         <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
           <span class="lang-content" data-lang="es">Usuario</span>
           <span class="lang-content" data-lang="en" style="display:none">Username</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Usuário</span>
         </label>
         <input type="text" name="username" value="admin" class="hl-input font-mono" autocomplete="off" />
       </div>
@@ -143,6 +161,7 @@
         <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">
           <span class="lang-content" data-lang="es">Contrase&ntilde;a</span>
           <span class="lang-content" data-lang="en" style="display:none">Password</span>
+          <span class="lang-content" data-lang="pt" style="display:none">Senha</span>
         </label>
         <div class="relative">
           <input id="captcha-password" type="password" name="password" class="hl-input font-mono pr-11" autocomplete="off" />
@@ -169,6 +188,7 @@
             <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">
               <span class="lang-content" data-lang="es">Respuesta</span>
               <span class="lang-content" data-lang="en" style="display:none">Answer</span>
+              <span class="lang-content" data-lang="pt" style="display:none">Resposta</span>
             </label>
             <input type="text" name="captcha" class="hl-input font-mono text-center text-lg"
                    style="height:42px"
@@ -185,6 +205,7 @@
         <i class="ph ph-sign-in"></i>
         <span class="lang-content" data-lang="es">Acceder a banca</span>
         <span class="lang-content" data-lang="en" style="display:none">Access banking</span>
+        <span class="lang-content" data-lang="pt" style="display:none">Acessar internet banking</span>
       </button>
     </form>
     {% endif %}

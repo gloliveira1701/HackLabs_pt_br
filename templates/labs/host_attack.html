@@ -23,6 +23,15 @@
       {% elif host_lab_id == 'network_pivoting' %}<h2 class="text-lg font-semibold mb-2">SSH pivoting and tunneling</h2><p class="text-sm text-gray-400">Discover a loopback-only service and create a tunnel from Kali to reach it.</p>
       {% else %}<h2 class="text-lg font-semibold mb-2">Database access and enumeration</h2><p class="text-sm text-gray-400">Obtain a shell, locate production configuration, connect to the database and crack the administrator hash offline.</p>{% endif %}
     </div>
+    <div class="lang-content" data-lang="pt" style="display:none">
+      {% if host_lab_id == 'host_enum' %}<h2 class="text-lg font-semibold mb-2">Reconhecimento de rede e serviços</h2><p class="text-sm text-gray-400">Realize uma enumeração externa a partir do Kali. Identifique portas, serviços e versões antes de tentar obter acesso.</p>
+      {% elif host_lab_id == 'credential_hunting' %}<h2 class="text-lg font-semibold mb-2">Busca de credenciais a partir de uma shell</h2><p class="text-sm text-gray-400">Parta de uma shell obtida no H03. Verifique configurações, variáveis de ambiente, históricos e backups acessíveis pelo usuário comprometido.</p>
+      {% elif host_lab_id == 'sudo_suid' %}<h2 class="text-lg font-semibold mb-2">Abuso de má configuração do sudo</h2><p class="text-sm text-gray-400">Enumere as permissões de sudo da conta comprometida e aproveite uma entrada <code>NOPASSWD: ALL</code> para escalar diretamente para root.</p>
+      {% elif host_lab_id == 'cron_persistence' %}<h2 class="text-lg font-semibold mb-2">Persistência via cron</h2><p class="text-sm text-gray-400">Localize uma tarefa agendada executada pelo root cujo script possa ser modificado e abuse dela para recuperar um artefato protegido.</p>
+      {% elif host_lab_id == 'ssh_lateral' %}<h2 class="text-lg font-semibold mb-2">Chaves SSH e movimento lateral</h2><p class="text-sm text-gray-400">Procure chaves privadas abandonadas, identifique seu proprietário e reutilize-as para acessar outra identidade no sistema.</p>
+      {% elif host_lab_id == 'network_pivoting' %}<h2 class="text-lg font-semibold mb-2">Pivoting e túneis SSH</h2><p class="text-sm text-gray-400">Descubra um serviço vinculado exclusivamente ao loopback e crie um túnel a partir do Kali para alcançá-lo.</p>
+      {% else %}<h2 class="text-lg font-semibold mb-2">Acesso e enumeração de banco de dados</h2><p class="text-sm text-gray-400">Obtenha uma shell, localize a configuração de produção, conecte-se ao banco de dados e quebre offline o hash do administrador.</p>{% endif %}
+    </div>
   </div>
 
   <div class="hl-card mb-6">
@@ -45,6 +54,7 @@ hostname</code></pre>{% endif %}
     <div class="text-xs uppercase tracking-wider mb-3" style="color:var(--hl-primary)" data-i18n="host_answer_title">Validar respuesta</div>
     <div class="lang-content text-sm text-gray-300 mb-3" data-lang="es">{% if host_lab_id == 'host_enum' %}¿Qué versión utiliza el servicio FTP de HackLabs?{% else %}¿Cuál es la contraseña en claro del usuario <code>administrator</code>?{% endif %}</div>
     <div class="lang-content text-sm text-gray-300 mb-3" data-lang="en" style="display:none">{% if host_lab_id == 'host_enum' %}Which version is used by the HackLabs FTP service?{% else %}What is the plaintext password for the <code>administrator</code> user?{% endif %}</div>
+    <div class="lang-content text-sm text-gray-300 mb-3" data-lang="pt" style="display:none">{% if host_lab_id == 'host_enum' %}Qual versão é utilizada pelo serviço FTP do HackLabs?{% else %}Qual é a senha em texto claro do usuário <code>administrator</code>?{% endif %}</div>
     {% if is_progress_user %}
     <div class="flex gap-2 items-end flex-wrap">
       <input class="host-answer-input hl-input font-mono text-xs flex-1 min-w-[220px]" autocomplete="off"
